@@ -1,0 +1,10 @@
+# Walk the onboarding slides to the photo-pick screen.
+# tap takes no timeout: modifier, so wait with assert_exists, then tap.
+app "run.mobai.numbra" fresh
+assert_exists ~"Continue" timeout:20000
+tap ~"Continue"
+tap ~"Continue"
+assert_exists ~"Try it free" timeout:8000
+tap ~"Try it free"
+assert_exists ~"Choose from library" timeout:8000
+screenshot "photo-pick"

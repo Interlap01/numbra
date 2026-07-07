@@ -1,0 +1,86 @@
+# Numbra CI — BYOD: drive a simulator/device on YOUR machine from a GitHub
+# runner over a Tailscale tunnel. The build is done on a macOS runner; a Linux
+# runner then uploads it to your host's MobAI HTTP API and runs the flows there.
+# The build never leaves your control; the runner only talks to your host.
+#
+# Manual (workflow_dispatch): the run needs your host (MobAI desktop app) awake
+# with a device attached, so it is not tied to push/PR.
+#
+# ── One-time host setup (the machine with the device) ──
+#   1. Run the MobAI desktop app; boot a simulator (or attach a device).
+#   2. API settings: enable "Allow external connections" and Generate a token.
+#   3. Install Tailscale so the host joins your tailnet (MagicDNS name below).
+#
+# ── Repo secrets ──
+#   TS_OAUTH_CLIENT_ID / TS_OAUTH_SECRET  Tailscale OAuth client (tag:ci).
+#   MOBAI_API_KEY                         MobAI account key (mobai_...) from the
+#                                         app's API Keys dialog. BYOD is Pro-only.
+#   MOBAI_TOKEN                           host API token (if you set one).
+#   MOBAI_ADDR                            host URL, e.g. http://my-mac:8686
+#                                         (MagicDNS name or tailnet IP).
+#
+# ── Tailscale ACL ──  allow tag:ci to reach the host on :8686.
+#
+# Note: a simulator host takes the .app directly (mobai-ci repackages it for
+# upload). A real iOS device needs a signed .ipa instead.
+
+name: BYOD (Tailscale)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project + build (Debug, simulator)
+        run: |
+          xcodegen generate
+          xcodebuild -project Numbra.xcodeproj -scheme Numbra \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug -derivedDataPath build build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: numbra-app
+          path: build/Build/Products/Debug-iphonesimulator/Numbra.app
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest # no device here; your host has it
+    steps:
+      - uses: actions/checkout@v4 # for flows/
+
+      - name: Download built .app
+        uses: actions/download-artifact@v4
+        with:
+          name: numbra-app
+          path: app-build/Numbra.app
+
+      - name: Connect to tailnet (ephemeral, tagged node)
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Install mobai-ci
+        uses: MobAI-App/mobai-ci@v1
+
+      # Uploads + installs the build on your host's device, then runs the flows
+      # there. Hash-skip avoids re-uploading an unchanged build on re-runs.
+      - name: Install app + run flows on the host
+        env:
+          MOBAI_ADDR: ${{ secrets.MOBAI_ADDR }}
+          MOBAI_API_KEY: ${{ secrets.MOBAI_API_KEY }} # BYOD is Pro-only
+          MOBAI_TOKEN: ${{ secrets.MOBAI_TOKEN }} # optional
+        run: mobai-ci test ./flows --app app-build/Numbra.app --output reports
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-byod-tailscale
+          path: reports

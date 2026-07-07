@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Numbra — Paint by Numbers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;1,6..96,500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* Gallery / Post-Impressionist palette */
+    --paper: #E7E3EF;          /* app “gallery wall” — pale lavender-grey */
+    --ink: #221B33;            /* deep ink-aubergine */
+    --muted: #786F8C;
+    --terra: #E0492F;          /* vermilion (Matisse/Van Gogh) */
+    --sage: #1E8A78;           /* viridian */
+    --gold: #E0A52E;           /* ochre gold (Klimt/Van Gogh) */
+    --ultra: #2746C9;          /* ultramarine */
+    --card: #FBFAFE;
+    --card-2: #E1DCEC;
+    --line: rgba(34,27,51,0.10);
+    --display: 'Bodoni Moda', 'Didot', Georgia, serif;
+    --ui: 'Space Grotesk', -apple-system, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #cfc9da;
+    background: radial-gradient(125% 95% at 50% 0%, #e4dfee 0%, #c4bcd6 100%);
+    font-family: var(--ui);
+    -webkit-font-smoothing: antialiased;
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  #root { min-height: 100vh; }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+  @keyframes sheen { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
+  @keyframes shakeX {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-7px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(3px); }
+  }
+  @keyframes popIn {
+    0% { transform: rotate(-1.5deg) scale(0.82); }
+    60% { transform: rotate(2deg) scale(1.04); }
+    100% { transform: rotate(-1.5deg) scale(1); }
+  }
+  button { font-family: var(--ui); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="ui-kit.jsx"></script>
+<script type="text/babel" src="fx.jsx"></script>
+<script type="text/babel" src="progression.jsx"></script>
+<script type="text/babel" src="pbn-engine.jsx"></script>
+<script type="text/babel" src="studio-extras.jsx"></script>
+<script type="text/babel" src="paint-extras.jsx"></script>
+<script type="text/babel" src="onboarding.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+<script type="text/babel" src="pbn-canvas.jsx"></script>
+<script type="text/babel" src="paint-screen.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>

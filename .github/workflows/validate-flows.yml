@@ -1,0 +1,19 @@
+# Fast gate: parse every .mob flow without a device or a build. Runs in seconds
+# on a Linux runner, so broken flow syntax fails the PR before the slow sim/BYOD
+# jobs spin up.
+
+name: Validate flows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: MobAI-App/mobai-ci@v1
+      - run: mobai-ci validate ./flows

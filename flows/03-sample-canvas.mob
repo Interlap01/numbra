@@ -1,0 +1,12 @@
+# Start a sample painting and reach the paintable canvas (generation is slow).
+app "run.mobai.numbra" fresh
+assert_exists ~"Continue" timeout:20000
+tap ~"Continue"
+tap ~"Continue"
+assert_exists ~"Try it free" timeout:8000
+tap ~"Try it free"
+assert_exists ~"Or try a sample painting" timeout:8000
+tap ~"Or try a sample painting"
+# Processing generates the canvas; "Find next piece" is a canvas-only control.
+assert_exists ~"Find next piece" timeout:45000
+screenshot "canvas"

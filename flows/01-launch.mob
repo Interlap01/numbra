@@ -1,0 +1,5 @@
+# Smoke: the app installs, launches, and renders its first screen.
+# Fresh install shows onboarding; the "Continue" CTA is the stable anchor.
+app "run.mobai.numbra" fresh
+assert_exists ~"Continue" timeout:20000
+screenshot "launched"

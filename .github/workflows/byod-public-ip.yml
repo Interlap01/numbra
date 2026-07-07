@@ -1,0 +1,80 @@
+# Numbra CI — BYOD over a public IP: drive a device on YOUR machine from a
+# GitHub runner with no tunnel, reaching the host's MobAI HTTP API directly at a
+# public address. Same as the Tailscale variant minus the tunnel step.
+#
+# SECURITY: exposing :8686 to the internet means anyone who reaches it can drive
+# your device. ALWAYS set a host API token (MOBAI_TOKEN) and prefer restricting
+# the source (firewall / security group) to GitHub's ranges. A tunnel
+# (byod-tailscale.yml) avoids opening a port at all and is the safer default.
+#
+# ── One-time host setup ──
+#   1. MobAI app: boot a simulator (or attach a device).
+#   2. API settings: enable "Allow external connections", bind to the right
+#      interface, and Generate a token.
+#   3. Port-forward / open :8686 to the host on your router/firewall.
+#
+# ── Repo secrets ──
+#   MOBAI_ADDR      http://<public-ip-or-dns>:8686
+#   MOBAI_TOKEN     host API token (REQUIRED here — do not run open to the world).
+#   MOBAI_API_KEY   MobAI account key (mobai_...); BYOD is Pro-only.
+
+name: BYOD (public IP)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project + build (Debug, simulator)
+        run: |
+          xcodegen generate
+          xcodebuild -project Numbra.xcodeproj -scheme Numbra \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug -derivedDataPath build build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: numbra-app
+          path: build/Build/Products/Debug-iphonesimulator/Numbra.app
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download built .app
+        uses: actions/download-artifact@v4
+        with:
+          name: numbra-app
+          path: app-build/Numbra.app
+
+      - name: Fail fast if no host token is set
+        env:
+          MOBAI_TOKEN: ${{ secrets.MOBAI_TOKEN }}
+        run: |
+          if [ -z "$MOBAI_TOKEN" ]; then
+            echo "::error::MOBAI_TOKEN is required for the public-IP path (do not expose :8686 without a token)."
+            exit 1
+          fi
+
+      - name: Install mobai-ci
+        uses: MobAI-App/mobai-ci@v1
+
+      - name: Install app + run flows on the host
+        env:
+          MOBAI_ADDR: ${{ secrets.MOBAI_ADDR }}
+          MOBAI_API_KEY: ${{ secrets.MOBAI_API_KEY }}
+          MOBAI_TOKEN: ${{ secrets.MOBAI_TOKEN }}
+        run: mobai-ci test ./flows --app app-build/Numbra.app --output reports
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-byod-public-ip
+          path: reports

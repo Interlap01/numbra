@@ -1,0 +1,76 @@
+# Numbra CI — iOS simulator on a GitHub-hosted macOS runner (free, no host, no
+# tunnel). Builds the app once, then runs the .mob flows on a booted simulator,
+# sharded across parallel runners. Nothing leaves the runner.
+#
+# Requires a runner image with the iOS 26 SDK/simulator (Numbra's deployment
+# target is iOS 26.0). If GitHub's macOS image lacks Xcode 26, either pin it
+# (maxim-lobanov/setup-xcode) or lower IPHONEOS_DEPLOYMENT_TARGET for CI.
+
+name: iOS simulator
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project + build (Debug, simulator)
+        run: |
+          xcodegen generate
+          xcodebuild -project Numbra.xcodeproj -scheme Numbra \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug -derivedDataPath build build
+
+      - name: Upload built .app
+        uses: actions/upload-artifact@v4
+        with:
+          name: numbra-app
+          path: build/Build/Products/Debug-iphonesimulator/Numbra.app
+
+  test:
+    needs: build
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2] # split flows round-robin across 2 runners
+    steps:
+      - uses: actions/checkout@v4 # for flows/
+
+      - name: Download built .app
+        uses: actions/download-artifact@v4
+        with:
+          name: numbra-app
+          path: app-build/Numbra.app
+
+      - name: Boot an iOS 26 simulator
+        run: |
+          # mobai-ci attaches to a running device; it does not boot one.
+          xcrun simctl boot "iPhone 16 Pro" || true
+          xcrun simctl bootstatus "iPhone 16 Pro" -b
+
+      - name: Install mobai-ci
+        uses: MobAI-App/mobai-ci@v1
+
+      - name: Run flows (shard ${{ matrix.shard }}/2)
+        run: |
+          mobai-ci test ./flows \
+            --app app-build/Numbra.app \
+            --shard ${{ matrix.shard }}/2 \
+            --output reports
+
+      - name: Upload reports
+        if: always() # keep JUnit + failure screenshots/UI-trees even when red
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-shard-${{ matrix.shard }}
+          path: reports
