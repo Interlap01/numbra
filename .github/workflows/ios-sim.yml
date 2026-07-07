@@ -48,11 +48,14 @@ jobs:
 
       # Installs mobai-ci and starts a simulator booting in the background
       # (cached, so later runs boot fast). Stays before other steps so the
-      # boot overlaps the app download.
+      # boot overlaps the app download. boot-sim-background: first runs start
+      # testing immediately while the reusable image builds in parallel (the
+      # save step at the end of the job keeps it).
       - name: Install mobai-ci + boot simulator
         uses: MobAI-App/mobai-ci@v1
         with:
           boot-sim: true # UDID lands in $MOBAI_SIM_UDID
+          boot-sim-background: "true"
 
       - name: Download built .app
         uses: actions/download-artifact@v4
@@ -75,3 +78,8 @@ jobs:
         with:
           name: reports-shard-${{ matrix.shard }}
           path: reports
+
+      # Last step: saves the simulator image built in the background (no-op
+      # when the cache already existed).
+      - uses: MobAI-App/mobai-ci/save@v1
+        if: always()
