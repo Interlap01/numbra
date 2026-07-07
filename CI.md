@@ -48,3 +48,6 @@ Only needed for the BYOD workflows (the sim + validate jobs need none):
   needs a signed `.ipa`.
 - Sharding (`--shard i/N`) parallelizes across runners and is most useful on the
   sim matrix; a single BYOD device serializes regardless.
+- The sim job boots the simulator in the background and lets `mobai-ci` wait for
+  it (`--wait-device`), so the ~2-3 min cold boot overlaps the app download and
+  mobai-ci install instead of blocking a step of its own.
