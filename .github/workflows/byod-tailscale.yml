@@ -18,6 +18,9 @@
 #   MOBAI_TOKEN                           host API token (if you set one).
 #   MOBAI_ADDR                            host URL, e.g. http://my-mac:8686
 #                                         (MagicDNS name or tailnet IP).
+#   MOBAI_DEVICE                          which device on the host to target
+#                                         (id or name); a host with several
+#                                         devices cannot auto-pick one.
 #
 # ── Tailscale ACL ──  allow tag:ci to reach the host on :8686.
 #
@@ -76,7 +79,11 @@ jobs:
           MOBAI_ADDR: ${{ secrets.MOBAI_ADDR }}
           MOBAI_API_KEY: ${{ secrets.MOBAI_API_KEY }} # BYOD is Pro-only
           MOBAI_TOKEN: ${{ secrets.MOBAI_TOKEN }} # optional
-        run: mobai-ci test ./flows --app app-build/Numbra.app --output reports
+        run: |
+          mobai-ci test ./flows \
+            --app app-build/Numbra.app \
+            --device "${{ secrets.MOBAI_DEVICE }}" \
+            --timeout 15m --output reports
 
       - name: Upload reports
         if: always()

@@ -1,0 +1,64 @@
+# Numbra CI - run the flows on a Sauce Labs cloud device from a GitHub runner.
+# No device on the runner: it builds the app, then mobai-ci runs the flows on a
+# real cloud device. Cloud runs are Pro (MOBAI_API_KEY).
+#
+# Manual (workflow_dispatch): cloud minutes are metered, so run it deliberately.
+#
+# ── Repo secrets ──
+#   MOBAI_API_KEY     MobAI account key (mobai_...) from the app's API Keys
+#                     dialog. Cloud runs are Pro.
+#   SAUCE_USERNAME    Sauce Labs credentials.
+#   SAUCE_ACCESS_KEY
+#   SAUCE_REGION      optional (e.g. us-west-1); the vendor defaults it.
+#
+# This targets a cloud iOS SIMULATOR (iPad ... Simulator), which takes the
+# Debug simulator .app the macOS runner builds - no code signing needed. To run
+# on a real cloud device instead, build+sign a device .ipa and pass that as
+# --app, and drop --virtual with a non-simulator --device/--os.
+
+name: Cloud device farm (Sauce Labs)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cloud:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project + build (Debug, simulator)
+        run: |
+          xcodegen generate
+          xcodebuild -project Numbra.xcodeproj -scheme Numbra \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug -derivedDataPath build build
+          echo "APP_PATH=$(find build/Build/Products -name '*.app' -type d | head -1)" >> "$GITHUB_ENV"
+
+      - name: Install mobai-ci
+        uses: MobAI-App/mobai-ci@v1
+
+      # Uploads the app to Sauce (deduplicated) and runs the flows on the cloud
+      # device. --allure also writes reports/allure-results/.
+      - name: Run flows on Sauce Labs
+        env:
+          MOBAI_API_KEY: ${{ secrets.MOBAI_API_KEY }}
+          SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
+          SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
+          SAUCE_REGION: ${{ secrets.SAUCE_REGION }}
+        run: |
+          mobai-ci test ./flows \
+            --cloud saucelabs --virtual \
+            --device "iPad (10th generation) Simulator" --os "16.2" \
+            --app "$APP_PATH" \
+            --timeout 20m --allure --output reports
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-cloud
+          path: reports
