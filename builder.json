@@ -5,7 +5,9 @@
     "owner": "Interlap01",
     "repo": "numbra"
   },
-  "ios": {},
+  "ios": {
+    "signing": true
+  },
   "flutter": {
     "watch": {}
   },
