@@ -1,0 +1,14 @@
+{
+  "project": "numbra",
+  "platform": "ios",
+  "github": {
+    "owner": "Interlap01",
+    "repo": "numbra"
+  },
+  "ios": {},
+  "flutter": {
+    "watch": {}
+  },
+  "reactNative": {},
+  "mobai": {}
+}
