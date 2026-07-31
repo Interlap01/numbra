@@ -1,4 +1,5 @@
 name: iOS Build
+run-name: iOS Build ${{ inputs.build_id }}
 
 on:
   workflow_dispatch:
@@ -7,6 +8,11 @@ on:
         description: 'Unique build identifier'
         required: true
         type: string
+      snapshot_ref:
+        description: 'Ref holding the working-tree snapshot to build (empty builds this branch)'
+        required: false
+        type: string
+        default: ''
       ios_path:
         description: 'Path to iOS project (e.g., "ios" for React Native)'
         required: false
@@ -41,6 +47,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # The dispatch always runs the workflow from the default branch, so the
+      # sources come from a snapshot ref pushed by the CLI instead.
+      - name: Checkout working-tree snapshot
+        if: inputs.snapshot_ref != ''
+        env:
+          SNAPSHOT_REF: ${{ inputs.snapshot_ref }}
+        run: |
+          set -e
+          git fetch --depth=1 origin "+$SNAPSHOT_REF:refs/heads/snapshot"
+          git checkout --force snapshot
+          echo "Building $(git rev-parse --short HEAD)"
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -252,6 +270,35 @@ jobs:
               flutter build ios --release --no-codesign
             fi
             cd "$IOS_PATH"
+
+            if [ "$USE_SIGNING" = "true" ]; then
+              # 'flutter build ios' never signs, so archive the Runner project it
+              # generated. The IPA step below exports build/App.xcarchive
+              # whenever signing is on.
+              ARCHIVE_CMD="xcodebuild"
+              if [ -n "$WORKSPACE" ]; then
+                ARCHIVE_CMD="$ARCHIVE_CMD -workspace '$WORKSPACE'"
+              elif [ -n "$PROJECT" ]; then
+                ARCHIVE_CMD="$ARCHIVE_CMD -project '$PROJECT'"
+              else
+                echo "::error::Signing requested but no Runner workspace/project found in '$IOS_PATH'."
+                exit 1
+              fi
+
+              ARCHIVE_CMD="$ARCHIVE_CMD -scheme '${SCHEME:-Runner}'"
+              ARCHIVE_CMD="$ARCHIVE_CMD -configuration '$CONFIGURATION'"
+              ARCHIVE_CMD="$ARCHIVE_CMD -destination 'generic/platform=iOS'"
+              ARCHIVE_CMD="$ARCHIVE_CMD -derivedDataPath '$DERIVED_DATA_PATH'"
+              ARCHIVE_CMD="$ARCHIVE_CMD COMPILER_INDEX_STORE_ENABLE=NO"
+              ARCHIVE_CMD="$ARCHIVE_CMD DEVELOPMENT_TEAM='$DEVELOPMENT_TEAM'"
+              ARCHIVE_CMD="$ARCHIVE_CMD CODE_SIGN_STYLE=Manual"
+              ARCHIVE_CMD="$ARCHIVE_CMD PROVISIONING_PROFILE_SPECIFIER='$PROVISIONING_PROFILE_NAME'"
+              ARCHIVE_CMD="$ARCHIVE_CMD -quiet"
+              ARCHIVE_CMD="$ARCHIVE_CMD -archivePath '$GITHUB_WORKSPACE/build/App.xcarchive' archive"
+
+              echo "Running: $ARCHIVE_CMD"
+              eval $ARCHIVE_CMD
+            fi
           elif [ "$PROJECT_TYPE" = "reactnative" ] || [ "$PROJECT_TYPE" = "expo" ]; then
             # Use xcodebuild directly for React Native/Expo
             echo "Building React Native iOS ($CONFIGURATION)..."
@@ -269,13 +316,23 @@ jobs:
               SCHEME=$(basename "$PROJECT" .xcodeproj)
             fi
 
-            BUILD_CMD="$BUILD_CMD -scheme $SCHEME"
-            BUILD_CMD="$BUILD_CMD -configuration $CONFIGURATION"
+            BUILD_CMD="$BUILD_CMD -scheme '$SCHEME'"
+            BUILD_CMD="$BUILD_CMD -configuration '$CONFIGURATION'"
             BUILD_CMD="$BUILD_CMD -destination 'generic/platform=iOS'"
-            BUILD_CMD="$BUILD_CMD -derivedDataPath $DERIVED_DATA_PATH"
-            BUILD_CMD="$BUILD_CMD CODE_SIGNING_ALLOWED=NO"
+            BUILD_CMD="$BUILD_CMD -derivedDataPath '$DERIVED_DATA_PATH'"
             BUILD_CMD="$BUILD_CMD COMPILER_INDEX_STORE_ENABLE=NO"
-            BUILD_CMD="$BUILD_CMD -quiet build"
+            BUILD_CMD="$BUILD_CMD -quiet"
+
+            if [ "$USE_SIGNING" = "true" ]; then
+              # Must archive, not build: the IPA step below exports
+              # build/App.xcarchive whenever signing is on.
+              BUILD_CMD="$BUILD_CMD DEVELOPMENT_TEAM='$DEVELOPMENT_TEAM'"
+              BUILD_CMD="$BUILD_CMD CODE_SIGN_STYLE=Manual"
+              BUILD_CMD="$BUILD_CMD PROVISIONING_PROFILE_SPECIFIER='$PROVISIONING_PROFILE_NAME'"
+              BUILD_CMD="$BUILD_CMD -archivePath '$GITHUB_WORKSPACE/build/App.xcarchive' archive"
+            else
+              BUILD_CMD="$BUILD_CMD CODE_SIGNING_ALLOWED=NO build"
+            fi
 
             echo "Running: $BUILD_CMD"
             eval $BUILD_CMD
