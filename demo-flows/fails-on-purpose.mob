@@ -1,0 +1,13 @@
+# Fails on purpose. Kept out of ./flows so it never turns the normal CI red,
+# and run on its own from the "Demo: failing run" workflow.
+#
+# The point is what happens after the failure: the run keeps its simulator open
+# so the failing screen can be opened in the MobAI app, rather than being
+# reproduced locally from a screenshot.
+app "run.mobai.numbra" fresh
+assert_exists ~"Continue" timeout:20000
+screenshot "before-the-failure"
+
+# There is no such button. The run stops here with the app on the onboarding
+# screen, which is the state you inherit when you join the device.
+assert_exists "Start Painting Immediately" timeout:5000

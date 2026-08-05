@@ -1,0 +1,77 @@
+# Demo: a run that fails on purpose, to show what happens next.
+#
+# The flow in ./demo-flows asserts something that is not on screen. When it
+# fails, mobai-ci keeps the simulator published so it can be opened in the MobAI
+# app and inspected on the screen that failed, instead of being reproduced
+# locally from a screenshot.
+#
+# Manual only (workflow_dispatch): it is red by design and would otherwise make
+# every push look broken.
+
+name: "Demo: failing run"
+
+on:
+  workflow_dispatch:
+    inputs:
+      hold:
+        description: "How long to keep the simulator open after the failure (idle time; resets while you are using it)"
+        required: false
+        default: "10m"
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project + build (Debug, simulator)
+        run: |
+          xcodegen generate
+          xcodebuild -project Numbra.xcodeproj -scheme Numbra \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug -derivedDataPath build build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: numbra-app-demo
+          path: build/Build/Products/Debug-iphonesimulator/Numbra.app
+
+  demo:
+    needs: build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mobai-ci + boot simulator
+        uses: MobAI-App/mobai-ci@v1
+        with:
+          version: "0.5.0"
+          boot-sim: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: numbra-app-demo
+          path: app-build/Numbra.app
+
+      # The job stays running while the simulator is held, and goes red when it
+      # closes. Releasing the device in the MobAI app ends it immediately.
+      - name: Run the failing flow
+        env:
+          MOBAI_API_KEY: ${{ secrets.MOBAI_API_KEY }}
+        run: |
+          mobai-ci test ./demo-flows \
+            --app app-build/Numbra.app \
+            --device "$MOBAI_SIM_UDID" \
+            --wait-device 4m --startup-timeout 5m \
+            --live --hold-on-failure ${{ inputs.hold }} \
+            --output reports
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-demo
+          path: reports
