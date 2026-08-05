@@ -52,6 +52,7 @@ jobs:
       - name: Install mobai-ci + boot simulator
         uses: MobAI-App/mobai-ci@v1
         with:
+          version: "0.5.0" # first release with --live
           boot-sim: true # UDID lands in $MOBAI_SIM_UDID
 
       - name: Download built .app
@@ -60,13 +61,22 @@ jobs:
           name: numbra-app
           path: app-build/Numbra.app
 
+      # --live shows this run's simulator in the MobAI app while it runs, so you
+      # can watch it. --hold-on-failure keeps it open afterwards if something
+      # breaks, so the failure can be looked at on the device that produced it
+      # instead of being reproduced locally. The window is idle time: it resets
+      # while you are using the device, and the job stays running until it
+      # closes or you release the device.
       - name: Run flows (shard ${{ matrix.shard }}/2)
+        env:
+          MOBAI_API_KEY: ${{ secrets.MOBAI_API_KEY }}
         run: |
           mobai-ci test ./flows \
             --app app-build/Numbra.app \
             --shard ${{ matrix.shard }}/2 \
             --device "$MOBAI_SIM_UDID" \
             --wait-device 4m --startup-timeout 5m \
+            --live --hold-on-failure 10m \
             --output reports
 
       - name: Upload reports
