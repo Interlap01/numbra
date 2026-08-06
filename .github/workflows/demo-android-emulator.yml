@@ -1,0 +1,51 @@
+# Demo: Android emulator in CI, watchable from the MobAI app.
+#
+# Numbra has no Android target, so this drives a system app. It exists to show
+# that an emulator booted on a GitHub runner shows up in MobAI while the run is
+# happening, the same as the iOS simulator workflow does.
+#
+# Runs on Linux: emulators need KVM, which GitHub's Ubuntu runners have and its
+# macOS runners do not.
+#
+# Manual only, since it proves the tooling rather than testing this app.
+
+name: "Demo: Android emulator"
+
+on:
+  workflow_dispatch:
+    inputs:
+      hold:
+        description: "Keep the emulator open this long after a failure (idle time)"
+        required: false
+        default: "10m"
+
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Boots a test-ready emulator and puts its serial in $MOBAI_EMU_SERIAL.
+      # The first run builds a reusable image, later runs resume from it.
+      - name: Install mobai-ci + boot emulator
+        uses: MobAI-App/mobai-ci@v1
+        with:
+          version: "0.5.1"
+          boot-emu: true
+
+      - name: Run the flow
+        env:
+          MOBAI_API_KEY: ${{ secrets.MOBAI_API_KEY }}
+        run: |
+          mobai-ci test ./demo-flows/android-settings.mob \
+            --device "$MOBAI_EMU_SERIAL" \
+            --wait-device 6m --startup-timeout 6m \
+            --live --hold-on-failure ${{ inputs.hold }} \
+            --output reports
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-android
+          path: reports
