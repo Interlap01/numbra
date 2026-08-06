@@ -1,0 +1,7 @@
+# Fails on purpose, Android flavour: launches Settings, then asserts a button
+# that does not exist. The run then holds the emulator so the failing screen
+# can be opened in the MobAI app.
+app "com.android.settings"
+assert_exists ~"Network" timeout:20000
+screenshot
+assert_exists "Enable Warp Drive" timeout:5000

@@ -37,7 +37,7 @@ jobs:
         env:
           MOBAI_API_KEY: ${{ secrets.MOBAI_API_KEY }}
         run: |
-          mobai-ci test ./demo-flows/android-settings.mob \
+          mobai-ci test ./demo-flows/android-fails.mob \
             --device "$MOBAI_EMU_SERIAL" \
             --wait-device 6m --startup-timeout 6m \
             --live --hold-on-failure ${{ inputs.hold }} \
