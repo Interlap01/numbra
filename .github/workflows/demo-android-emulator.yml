@@ -30,7 +30,7 @@ jobs:
       - name: Install mobai-ci + boot emulator
         uses: MobAI-App/mobai-ci@v1
         with:
-          version: "0.5.1"
+          version: "0.5.3"
           boot-emu: true
 
       - name: Run the flow

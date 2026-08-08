@@ -52,7 +52,7 @@ jobs:
       - name: Install mobai-ci + boot simulator
         uses: MobAI-App/mobai-ci@v1
         with:
-          version: "0.5.1" # first release with --live
+          version: "0.5.3"
           boot-sim: true # UDID lands in $MOBAI_SIM_UDID
 
       - name: Download built .app

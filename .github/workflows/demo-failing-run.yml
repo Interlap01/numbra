@@ -48,7 +48,7 @@ jobs:
       - name: Install mobai-ci + boot simulator
         uses: MobAI-App/mobai-ci@v1
         with:
-          version: "0.5.1"
+          version: "0.5.3"
           boot-sim: true
 
       - uses: actions/download-artifact@v4
