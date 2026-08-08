@@ -1,0 +1,16 @@
+# Android live-view check. Numbra is iOS-only, so this drives a system app
+# instead: the point is the emulator showing up in MobAI while CI runs it, not
+# what is on screen.
+#
+# Settings is used because it ships on every image and its top-level rows are
+# stable across API levels.
+app "com.android.settings"
+assert_exists ~"Network" timeout:20000
+screenshot "settings"
+
+# Room to open the device in MobAI and watch it move before the run ends.
+swipe up
+delay 5000
+swipe down
+delay 5000
+assert_exists ~"Network" timeout:10000
