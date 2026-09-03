@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "framework": "ios",
+  "previewEngine": "swiftui",
+  "profile": "iphone-standard",
+  "engines": {
+    "flutter": {
+      "command": "dart",
+      "args": [
+        "run",
+        "bin/preview_flutter.dart",
+        "run",
+        "{project}",
+        "--profile",
+        "{profile}"
+      ]
+    },
+    "rn": {
+      "command": "node",
+      "args": [
+        "dist/src/cli.js",
+        "run",
+        "{project}",
+        "--profile",
+        "{profile}",
+        "--entry",
+        "{entry}",
+        "--scenario",
+        "{scenario}"
+      ]
+    },
+    "swiftui": {
+      "command": "swift",
+      "args": [
+        "run",
+        "--package-path",
+        ".",
+        "preview-swiftui",
+        "run",
+        "{project}",
+        "--profile",
+        "{profile}",
+        "--entry",
+        "{entry}"
+      ],
+      "env": [
+        "OPENSWIFTUI_OPENATTRIBUTESHIMS_ATTRIBUTEGRAPH=0",
+        "OPENSWIFTUI_OPENATTRIBUTESHIMS_COMPUTE=1",
+        "OPENATTRIBUTEGRAPH_OPENATTRIBUTESHIMS_COMPUTE=1",
+        "OPENATTRIBUTESHIMS_COMPUTE=1"
+      ]
+    }
+  }
+}
