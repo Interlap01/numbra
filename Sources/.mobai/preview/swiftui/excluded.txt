@@ -1,0 +1,13 @@
+# Files kept out of the preview build.
+#
+# The imperative paint canvas is a layer-backed UIView driven by a
+# CADisplayLink, so it needs @objc selectors and UIAccessibilityElement. The
+# preview engine compiles on Linux with no Objective-C runtime and refuses the
+# file, which strands MinimapView (declared beside it) and with it PaintView,
+# Overlays, OnboardingView and UploadView — that is, every screen.
+#
+# CanvasStandIn.swift beside this file supplies the names those screens need.
+# The paint screen itself is therefore NOT previewable; use a simulator or a
+# device for anything about the canvas.
+Sources/Canvas/PaintCanvasView.swift
+Sources/Canvas/PaintCanvas.swift
