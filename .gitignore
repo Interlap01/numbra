@@ -29,3 +29,12 @@ remotion-brand/
 # Local Swift toolchain artifacts (swiftly, used by the mobai preview engine)
 .swift-version
 swiftly-*.tar.gz
+
+# mobai preview engine scratch.
+# The engine anchors a workspace at the entry file's own directory, so
+# previewing e.g. Sources/UI/Components.swift creates Sources/UI/.mobai/.
+# Those hold only the engine's own .gitignore plus a rebuilt SwiftPM tree.
+# Sources/.mobai/ is NOT ignored: the stand-ins and adapters there are
+# authored, and its own .gitignore already excludes the scratch inside it.
+Sources/*/.mobai/
+.mobai/preview.state
