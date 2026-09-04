@@ -25,3 +25,7 @@ remotion-brand/
 
 # CI credentials never belong in git
 *.env
+
+# Local Swift toolchain artifacts (swiftly, used by the mobai preview engine)
+.swift-version
+swiftly-*.tar.gz
