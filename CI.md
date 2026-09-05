@@ -85,7 +85,10 @@ builder init --provider bitrise --app-id YOUR_BITRISE_APP_SLUG --branch main
 Codemagic is connected as app `6a9bf5d20851f071f4320885`, using the
 `ci/macos-providers` branch for workflow configuration. Bitrise is connected as
 app `7812c85a-da58-4943-b507-cc58f640a05e` in the existing workspace, with private
-build visibility and repository YAML. Both providers use `ci/macos-providers`. Login prompts hide API tokens and save each account
+build visibility. Both providers use `ci/macos-providers`. Codemagic reads
+repository YAML. Bitrise currently uses an identical uploaded YAML copy because
+its repository-mode API returns HTTP 500; upload workflow changes in its Workflow
+Editor until repository mode can be enabled. Login prompts hide API tokens and save each account
 independently; do not put tokens in repository files.
 
 Commit the updated `builder.json` and merge these workflow files into `main`
@@ -97,9 +100,9 @@ and runner; Builder uploads the current application source as a snapshot.
   the M2 Mac. Create an accessible environment group named `builder`; add
   `BUILDER=1` for unsigned builds. Its Xcode selection is `latest`, which must
   include the iOS 26 SDK.
-- **Bitrise:** the committed YAML selects Xcode 26.2; enable configuration
-  from the repository's `bitrise.yml`, and disable onboarding-generated push
-  triggers. The workflow selects `g2.mac.medium`; keep the app timeout at or
+- **Bitrise:** the committed YAML selects Xcode 26.2. Its uploaded configuration matches
+  `bitrise.yml` and has no automatic push triggers. Repository mode is pending
+  resolution of the provider API error. The workflow selects `g2.mac.medium`; keep the app timeout at or
   below 90 minutes.
 
 See the official [Codemagic app setup](https://docs.codemagic.io/getting-started/adding-apps/)
