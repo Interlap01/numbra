@@ -108,6 +108,30 @@ Bitrise's verified build reported `g2.mac.large` despite the medium request.
 
 ### Signing and simulator access
 
+Follow the [signing and MobAI secret setup guide](https://github.com/MobAI-App/ios-builder/blob/feat/macos-ci-providers/docs/provider-secrets.md)
+for certificate/profile preparation, base64 clipboard commands on macOS/Linux/
+Windows, MobAI key creation, and verification.
+
+For Numbra's existing apps:
+
+1. Open [Numbra in Codemagic](https://codemagic.io/app/6a9bf5d20851f071f4320885),
+   select **Environment variables**, and add the values below to the existing
+   **`builder`** group. Mark each value **Secret** and save it.
+2. Open [Numbra in Bitrise](https://app.bitrise.io/app/7812c85a-da58-4943-b507-cc58f640a05e),
+   select **Workflows → Secrets → Add new**, and save the same names/values as
+   project secrets. Leave **Replace variables in inputs** and **Expose for Pull
+   Requests** off.
+
+| Name | Value |
+| --- | --- |
+| `IOS_CERTIFICATE` | Base64 Apple Development P12, including its private key |
+| `IOS_CERTIFICATE_PASSWORD` | Original P12 password; do not base64-encode |
+| `IOS_PROVISIONING_PROFILE` | Base64 iOS App Development profile for `run.mobai.numbra`, the same certificate/team, and registered devices |
+| `MOBAI_API_KEY` | Key created in MobAI's **Account → API Keys**; paste the original value |
+
+For simulator sharing, only `MOBAI_API_KEY` is needed. Signed iPhone builds need
+all three `IOS_*` secrets. The generated runner exports development-signed IPAs.
+
 Numbra already enables signing for GitHub. Configure `IOS_CERTIFICATE`
 (base64 P12), `IOS_CERTIFICATE_PASSWORD`, and `IOS_PROVISIONING_PROFILE`
 (base64 provisioning profile for `run.mobai.numbra`) separately in Codemagic's
@@ -118,6 +142,15 @@ and copied by Builder. Until signing is configured, test with:
 builder ios build --provider codemagic --unsigned
 builder ios build --provider bitrise --unsigned
 ```
+
+Once the three signing secrets are saved, verify signing without `--unsigned`:
+
+```sh
+builder ios build --provider codemagic
+builder ios build --provider bitrise
+```
+
+Install the IPA on a device included in the profile to check provisioning.
 
 Unsigned IPAs do not install directly on an iPhone. Simulator sharing needs
 `MOBAI_API_KEY` on each provider and a MobAI account supporting CI devices:
