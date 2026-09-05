@@ -1,0 +1,9 @@
+# Engine log and the detached preview's port/pid — per-machine, per-run.
+preview.log
+preview.state
+
+# Sources the engine generates for a preview build; rebuilt on every run.
+preview/*/generated/
+
+# NOT ignored: preview/*/mocks/ and preview/*/sources/ are adapters that
+# belong to the project — written once, reused by everyone previewing it.

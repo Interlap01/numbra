@@ -25,3 +25,7 @@ remotion-brand/
 
 # CI credentials never belong in git
 *.env
+
+# swiftly toolchain pin, written when installing Swift for the mobai preview.
+# The app itself is built by Xcode, so this is a per-machine artifact.
+.swift-version
