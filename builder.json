@@ -12,7 +12,12 @@
     "build_workflow": "ios-build",
     "share_workflow": "ios-share"
   },
-  "bitrise": {},
+  "bitrise": {
+    "app_id": "7812c85a-da58-4943-b507-cc58f640a05e",
+    "branch": "ci/macos-providers",
+    "build_workflow": "ios-build",
+    "share_workflow": "ios-share"
+  },
   "ios": {
     "path": ".",
     "scheme": "Numbra",

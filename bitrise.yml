@@ -4,6 +4,7 @@ default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
 project_type: ios
 meta:
   bitrise.io:
+    stack: osx-xcode-26.2.x
     machine_type_id: g2.mac.medium
 workflows:
   ios-build:
