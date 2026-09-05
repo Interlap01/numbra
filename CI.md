@@ -82,8 +82,9 @@ builder init --provider codemagic --app-id YOUR_CODEMAGIC_APP_ID --branch main
 builder init --provider bitrise --app-id YOUR_BITRISE_APP_SLUG --branch main
 ```
 
-The app IDs are intentionally absent from `builder.json` until real provider
-apps are connected. Login prompts mask API tokens and save each account
+Codemagic is connected as app `6a9bf5d20851f071f4320885`, using the
+`ci/macos-providers` branch for workflow configuration. Bitrise account setup
+is still pending. Login prompts hide API tokens and save each account
 independently; do not put tokens in repository files.
 
 Commit the updated `builder.json` and merge these workflow files into `main`

@@ -5,15 +5,23 @@
     "owner": "Interlap01",
     "repo": "numbra"
   },
+  "provider": "github",
+  "codemagic": {
+    "app_id": "6a9bf5d20851f071f4320885",
+    "branch": "ci/macos-providers",
+    "build_workflow": "ios-build",
+    "share_workflow": "ios-share"
+  },
+  "bitrise": {},
   "ios": {
-    "signing": true,
     "path": ".",
-    "scheme": "Numbra"
+    "scheme": "Numbra",
+    "signing": true
   },
   "flutter": {
     "watch": {}
   },
   "reactNative": {},
-  "mobai": {},
-  "provider": "github"
+  "kmp": {},
+  "mobai": {}
 }
