@@ -64,50 +64,47 @@ its Xcode project with XcodeGen.
 `ios-build` (IPA) and `ios-share` (MobAI simulator) workflows. These workflows
 run when dispatched by Builder. They do not replace the GitHub UI test jobs.
 
-### Complete account setup
+### Account and repository setup
 
-This configuration requires the provider-enabled Builder CLI from
-[ios-builder PR #12](https://github.com/MobAI-App/ios-builder/pull/12).
-Homebrew version 0.7.0 does not include these commands. Until a release is
-available, build the `feat/macos-ci-providers` branch of ios-builder and use that
-binary for the commands below.
+Follow Builder's [app creation and repository connection guide](https://github.com/MobAI-App/ios-builder/blob/feat/macos-ci-providers/docs/provider-setup.md)
+for dashboard links, API tokens, app IDs, repository authorization, and YAML
+selection. This needs the provider-enabled CLI from
+[ios-builder PR #12](https://github.com/MobAI-App/ios-builder/pull/12);
+Homebrew 0.7.0 does not include provider commands.
 
-Register `https://github.com/Interlap01/numbra.git` with both providers, then:
+Numbra's existing apps are:
+
+| Provider | App | Configuration |
+| --- | --- | --- |
+| Codemagic | [Numbra](https://codemagic.io/app/6a9bf5d20851f071f4320885) | Personal Account, `codemagic.yaml`, environment group `builder` |
+| Bitrise | [Numbra](https://app.bitrise.io/app/7812c85a-da58-4943-b507-cc58f640a05e) | Private build visibility, repository `bitrise.yml`, Xcode 26.2 |
+
+Both connect to [Interlap01/numbra](https://github.com/Interlap01/numbra) and use
+`ci/macos-providers` for workflow configuration. Bitrise's GitHub connection and
+repository YAML mode are now enabled. Connecting GitHub is required separately
+from creating the API token or registering the app.
+
+To configure another local checkout with these existing apps:
 
 ```sh
 builder auth codemagic
 builder auth bitrise
 builder auth status
-builder init --provider codemagic --app-id YOUR_CODEMAGIC_APP_ID --branch main
-builder init --provider bitrise --app-id YOUR_BITRISE_APP_SLUG --branch main
 ```
 
-Codemagic is connected as app `6a9bf5d20851f071f4320885`, using the
-`ci/macos-providers` branch for workflow configuration. Bitrise is connected as
-app `7812c85a-da58-4943-b507-cc58f640a05e` in the existing workspace, with private
-build visibility. Both providers use `ci/macos-providers`. Codemagic reads
-repository YAML. Bitrise currently uses an identical uploaded YAML copy because
-its repository-mode API returns HTTP 500; upload workflow changes in its Workflow
-Editor until repository mode can be enabled. Login prompts hide API tokens and save each account
-independently; do not put tokens in repository files.
+Use the committed `builder.json`, which already contains both app IDs. To create
+apps for a different repository, follow the guide and use those apps' IDs.
+`builder init --provider ...` replaces generated YAML, so review customized files
+before rerunning it.
 
-Commit the updated `builder.json` and merge these workflow files into `main`
-before dispatching. To test before merging, configure `--branch ci/macos-providers`
-and push the workflow files there. The configured branch supplies the workflow
-and runner; Builder uploads the current application source as a snapshot.
+The workflow branch supplies the YAML and runner; Builder uploads the current
+application source as a snapshot. After merging the setup PR, update both
+provider `branch` values in `builder.json` to `main`, plus Bitrise's default
+branch, before deleting `ci/macos-providers`.
 
-- **Codemagic:** use a personal account and repository YAML. The workflow selects
-  the M2 Mac. Create an accessible environment group named `builder`; add
-  `BUILDER=1` for unsigned builds. Its Xcode selection is `latest`, which must
-  include the iOS 26 SDK.
-- **Bitrise:** the committed YAML selects Xcode 26.2. Its uploaded configuration matches
-  `bitrise.yml` and has no automatic push triggers. Repository mode is pending
-  resolution of the provider API error. The workflow selects `g2.mac.medium`; keep the app timeout at or
-  below 90 minutes.
-
-See the official [Codemagic app setup](https://docs.codemagic.io/getting-started/adding-apps/)
-and [Bitrise app setup](https://docs.bitrise.io/en/bitrise-ci/getting-started/adding-a-new-project)
-guides for connecting the repository.
+The workflows request Codemagic M2 and Bitrise `g2.mac.medium` with no automatic
+push triggers. Check the actual machine and credit usage in the build details:
+Bitrise's initial runs reported `g2.mac.large` despite the medium request.
 
 ### Signing and simulator access
 
