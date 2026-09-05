@@ -104,7 +104,7 @@ branch, before deleting `ci/macos-providers`.
 
 The workflows request Codemagic M2 and Bitrise `g2.mac.medium` with no automatic
 push triggers. Check the actual machine and credit usage in the build details:
-Bitrise's initial runs reported `g2.mac.large` despite the medium request.
+Bitrise's verified build reported `g2.mac.large` despite the medium request.
 
 ### Signing and simulator access
 
@@ -131,3 +131,17 @@ The CLI prints the run URL, cancellation command, and snapshot cleanup command.
 New-provider sharing returns once submitted; check the run for readiness and
 release or cancel sessions when finished. Provider selection is manual; free
 allowances are account-specific and are not pooled by Builder.
+
+
+### Verified unsigned builds
+
+Both providers built `run.mobai.numbra` and Builder downloaded validated IPAs:
+
+- [Codemagic build](https://codemagic.io/app/6a9bf5d20851f071f4320885/build/6a9bfb2ea63f14a97ef98a58): completed in 2m19s including download.
+- [Bitrise build](https://app.bitrise.io/build/ecf8c1df-66f9-4e2d-82d2-dda9c462b25b): completed in 26s including download, using repository YAML and Xcode 26.2.
+
+Bitrise stores unsigned IPAs with an `.ipa.zip` name as generic artifacts because
+its installable-IPA uploader requires a provisioning profile. Builder validates
+the unchanged IPA bytes and restores the `.ipa` extension on download. These
+checks cover unsigned builds; signed builds and simulator sharing still require
+the secrets listed above.
