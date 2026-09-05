@@ -96,7 +96,10 @@ report the preview as degraded until they decide; never accept a license or
 silently settle for the degraded default on their behalf.
 
 The setup plan lists this up front as `apple-design-resources`, marked
-`optional`: SF Pro for the text and SF Symbols for every `Image(systemName:)`.
+`optional`: SF Pro for the text (Text, Display and Rounded cuts, plus New
+York for `.serif` and SF Mono for `.monospaced`, so `.fontDesign` and large
+titles measure and draw with the face a phone uses) and SF Symbols for every
+`Image(systemName:)`.
 `ready` stays `yes` without them, and that is the trap: the preview runs, and
 every screenshot has substitute text and placeholder boxes where the app's
 symbols are, which a reviewer reads as a broken app. So when the plan lists it
@@ -186,6 +189,8 @@ the same project.
 | `ENGINE_NOT_PERMITTED` | the engine was started without its permission, which normally means it was run directly | start previews with `mobai-dev preview`, never by calling the engine binary |
 | `PREVIEW_UNSUPPORTED_MODULE` | dependencies that cannot run in the preview. `modules` lists every one found at once | first check the target is the screen's file and not the project (see [Choosing what to preview](#choosing-what-to-preview)); if the screen really needs them, write the adapters in one go: [writing-preview-adapters.md](./writing-preview-adapters.md) |
 | `PREVIEW_COMPILE_FAILED` | the source does not compile | `details.errors` carries the compiler's lines; fix what they name |
+| `PREVIEW_UNIMPLEMENTED` | SwiftUI: the screen reached an API the preview engine has not implemented (`details.api`, `details.site`, `details.appFrame`) | yours to implement: see [When the engine has not implemented something](#when-the-engine-has-not-implemented-something) |
+| `PREVIEW_CRASHED` | SwiftUI: the preview process died; the backtrace is in the log | if the backtrace names an engine API, same as above; if it names the app's code, the preview found a real bug |
 | `PREVIEW_APP_ERROR` | React Native: the app threw before rendering | `details.pageError` names the file and line; `details.bundlerError` the module that failed to transform |
 | `PREVIEW_RESTART_REQUIRED` | Flutter: an adapter was added or removed after the engine started | `preview stop`, then `preview run` again |
 | `PREVIEW_MOCK_UNSUPPORTED` | capability not held by this engine | `details` lists what it does hold |
@@ -218,10 +223,27 @@ A package that talks to real hardware cannot execute in a preview. The engine
 refuses with `PREVIEW_UNSUPPORTED_MODULE` naming the module, the importing
 file, and the exact path where an adapter goes.
 
-Before writing anything, check the adapters catalogue: dozens of common
-packages already have a drop-in adapter, listed with what each covers at
-https://github.com/MobAI-App/mobai-dev/blob/main/adapters/INDEX.md. A
-catalogue file goes into the path the diagnostic named, unchanged:
+The engine tries the adapters catalogue first, by itself: dozens of common
+packages already have a drop-in adapter, and `mobai-dev engines install`
+keeps a local copy of the catalogue under `~/.mobai/adapters`. When an
+import cannot resolve and the copy has an adapter for it, the engine puts
+that file into the mocks directory (first line `// mobai-adapter: ...`
+naming the catalogue commit) and starts again; you see a note, not a
+diagnostic. The copy is the project's now: edit it freely.
+
+When the diagnostic still comes, read its last sentence. "No local adapters
+catalogue was found" means the copy was never fetched, so:
+
+```bash
+mobai-dev adapters update     # fetch or refresh the local catalogue
+mobai-dev adapters status     # where it is and which commit
+```
+
+then run the preview again. "has no adapter of that name" means the
+catalogue does not cover the module; check the index anyway, since a
+freshly merged adapter may be newer than the copy, at
+https://github.com/MobAI-App/mobai-dev/blob/main/adapters/INDEX.md, and fetch
+it raw into the path the diagnostic named:
 
 ```bash
 # SwiftUI: adapters/swiftui/<Module>.swift, RN: adapters/rn/<package>.ts(x),
@@ -254,6 +276,109 @@ source:
 
 Both are `.mobai/`-only. If the engine's own message tells you where the
 name should go, that path wins.
+
+## When the engine has not implemented something
+
+The SwiftUI preview engine is a reimplementation, and parts of SwiftUI are
+still missing from it. When a screen reaches one, the preview stops with
+`PREVIEW_UNIMPLEMENTED`: `details.api` names the API (`GraphicsContext.fill(_:with:)`,
+`Path.contains(_:eoFill:)`), `details.site` the engine file, `details.appFrame` the
+app line that reached it when known.
+
+Most of these are announced before the first run: the engine's notes carry
+`PREVIEW_UNIMPLEMENTED_API` lines naming the file, the API and the override
+whenever a staged source calls into something the engine lacks. Treat a
+note as the same work, done earlier.
+
+**This is yours to implement.** Nobody at MobAI is going to do it for this
+run, the app's source is not to be touched, and there is no flag that makes
+it go away. Everything you need is project-side:
+
+- **Shadow the type.** Declare your own `struct Canvas<Symbols: View>: View`,
+  `struct AsyncImage`, `class UIBezierPath` in
+  `.mobai/preview/swiftui/sources/<Type>.swift`. App code binds to the
+  project's declaration over any imported one, engine types included, with no
+  import changes. Express the drawing with what the preview already paints:
+  shapes and `Path`, fills, gradients, images, text. A shadowed `Canvas` that
+  records the closure's fills into `Path`s and shows them as `Shape`s renders.
+  Limits: a qualified name (`SwiftUI.Canvas`), a contextual member
+  (`.thinMaterial`) and a value handed to an API that wants the engine's own
+  type are not shadowed; those go through a rewrite.
+- **Rewrite the call.** For a modifier or method on a type you cannot replace,
+  add a rule to `.mobai/preview/swiftui/rewrites.json` mapping the member to
+  one you declare in `sources/` as an extension. The engine applies it to the
+  staged copy of every app file; the app's files are untouched.
+
+  ```json
+  {"rules": [
+    {"kind": "memberCall", "name": "contentTransition", "to": "_previewContentTransition",
+     "on": "View", "target": "Sources/UI/*.swift", "expectedMatches": 1}
+  ]}
+  ```
+
+  `kind` is one of `memberCall` (`.name(...)`, `.name { }`), `memberProperty`
+  (`.name`), `keyPathMember` (`\.name`), `initializer` (`Name(...)`),
+  `qualifiedName` (`SwiftUI.Name`). `target` is a glob on the file's path
+  under the project (default: every file). `expectedMatches` fails the build
+  as `PREVIEW_REWRITE_MISMATCH` when a build that staged the targeted file
+  saw another count, so a rule that stopped matching is noticed. The engine
+  notes every rule's count per file.
+
+  A call inside a **local package** is rewritten too, but that module cannot
+  see `sources/`: put its replacement in
+  `.mobai/preview/swiftui/targets/<Module>/<Name>.swift`, which compiles into
+  that module's preview copy.
+- **Give the app's own method a preview body.** When a body in the app's
+  code cannot compile for the preview (a call into a hardware framework the
+  preview has no stand-in for, say), the build does not fail: that one body
+  becomes a trap and the rest of the file stays real. Bitmap drawing is not
+  such a case: `CGContext`, `CGImage`, `UIGraphicsImageRenderer`,
+  `UIImage(cgImage:)`, `pngData()` and `Image(uiImage:)` are real on Linux
+  (Cairo behind CoreGraphics), a `UIView` that overrides `draw(_:)` draws
+  into its frame, and `[CGColor] as CFArray` is accepted. What is not there:
+  text drawing through NSString, CoreImage filters, shadow blur (shadows
+  draw offset, unblurred). The engine notes each demoted body,
+  and the tree and `/info` carry `"compileFallback": N`. If the screen
+  actually reaches a trapped body, the preview stops with
+  `PREVIEW_UNIMPLEMENTED` whose `origin` is `app` and whose `api` names the
+  method. The fix is a `declarationBody` rule: the statements you write are
+  spliced into the original declaration when the file is staged, so call
+  sites, protocol dispatch, generics and private members all keep working.
+
+  ```json
+  {"kind": "declarationBody", "name": "SoundBank.preload(_:)",
+   "target": "Sources/Engine/SoundBank.swift",
+   "body": "bodies/SoundBank.preload.swift", "expectedMatches": 1}
+  ```
+
+  `name` is the enclosing types dotted, then the member with its argument
+  labels (`Store.init(path:)`, `Theme.accent` for a computed property).
+  `body` is a file under `.mobai/preview/swiftui/` holding plain statements,
+  no braces. Return what the preview can show: a placeholder image, a
+  description, a fixed value. Files with `@objc`, `#selector` or
+  `CADisplayLink` compile as they are; the interop is removed from the
+  staged copy and the display link never fires.
+- **Compose the primitives.** Beside every fill, shape, `Path`, gradient,
+  image, text and symbol the preview paints, `import SwiftUI` brings four
+  views made for overrides:
+  `PreviewRaster(png:)` draws bytes you produced (a software rasteriser, or
+  pixels computed outright);
+  `PreviewBackdropBlur(sigma:)` blurs what is already painted under its
+  frame, which is what a Material is (put a translucent fill over it);
+  `PreviewGroup(opacity:clip:) { }` composites its content as one layer with
+  that opacity, clipped to a `Path` in its own coordinates;
+  and a `StrokeStyle`'s dash, cap and join are honoured on any stroke.
+  A tappable control in an override is an ordinary `Button` or gesture;
+  they register with the control tree like the app's own.
+- Keep it honest: a stand-in that draws nothing where the app draws
+  something is a wrong preview, not a fixed one. Draw the closest thing the
+  primitives allow, and say what is approximated in your report.
+
+**Then contribute it.** An override written for one project fixes the same
+API for every project. Open a PR to https://github.com/MobAI-App/mobai-dev
+adding the file under `adapters/swiftui/overrides/`, with one line in
+`adapters/INDEX.md` saying which API it covers. Do this every time; it is
+how the catalogue got its adapters.
 
 ## Framework differences
 
