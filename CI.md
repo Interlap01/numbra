@@ -66,7 +66,7 @@ run when dispatched by Builder. They do not replace the GitHub UI test jobs.
 
 ### Account and repository setup
 
-Follow Builder's [app creation and repository connection guide](https://github.com/MobAI-App/ios-builder/blob/feat/macos-ci-providers/docs/provider-setup.md)
+Follow Builder's [app creation and repository connection guide](https://github.com/MobAI-App/ios-builder/blob/1e7e5a5763e2a76d8601732076b15b7f72e514f4/docs/provider-setup.md)
 for dashboard links, API tokens, app IDs, repository authorization, and YAML
 selection. This needs the provider-enabled CLI from
 [ios-builder PR #12](https://github.com/MobAI-App/ios-builder/pull/12);
@@ -108,7 +108,7 @@ Bitrise's verified build reported `g2.mac.large` despite the medium request.
 
 ### Signing and simulator access
 
-Follow the [signing and MobAI secret setup guide](https://github.com/MobAI-App/ios-builder/blob/feat/macos-ci-providers/docs/provider-secrets.md)
+Follow the [signing and MobAI secret setup guide](https://github.com/MobAI-App/ios-builder/blob/1e7e5a5763e2a76d8601732076b15b7f72e514f4/docs/provider-secrets.md)
 for certificate/profile preparation, base64 clipboard commands on macOS/Linux/
 Windows, MobAI key creation, and verification.
 
