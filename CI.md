@@ -51,3 +51,81 @@ Only needed for the BYOD workflows (the sim + validate jobs need none):
 - The sim job boots the simulator in the background and lets `mobai-ci` wait for
   it (`--wait-device`), so the ~2-3 min cold boot overlaps the app download and
   mobai-ci install instead of blocking a step of its own.
+
+
+## Builder macOS providers
+
+GitHub Actions remains the default in `builder.json`; existing `builder ios build`
+and `builder ios share` commands keep using GitHub. Numbra uses the root
+`project.yml`, the `Numbra` scheme, and an iOS 26 SDK. The shared runner generates
+its Xcode project with XcodeGen.
+
+`codemagic.yaml`, `bitrise.yml`, and `.builder/ci/runner.sh` provide the
+`ios-build` (IPA) and `ios-share` (MobAI simulator) workflows. These workflows
+run when dispatched by Builder. They do not replace the GitHub UI test jobs.
+
+### Complete account setup
+
+This configuration requires the provider-enabled Builder CLI from
+[ios-builder PR #12](https://github.com/MobAI-App/ios-builder/pull/12).
+Homebrew version 0.7.0 does not include these commands. Until a release is
+available, build the `feat/macos-ci-providers` branch of ios-builder and use that
+binary for the commands below.
+
+Register `https://github.com/Interlap01/numbra.git` with both providers, then:
+
+```sh
+builder auth codemagic
+builder auth bitrise
+builder auth status
+builder init --provider codemagic --app-id YOUR_CODEMAGIC_APP_ID --branch main
+builder init --provider bitrise --app-id YOUR_BITRISE_APP_SLUG --branch main
+```
+
+The app IDs are intentionally absent from `builder.json` until real provider
+apps are connected. Login prompts mask API tokens and save each account
+independently; do not put tokens in repository files.
+
+Commit the updated `builder.json` and merge these workflow files into `main`
+before dispatching. To test before merging, configure `--branch ci/macos-providers`
+and push the workflow files there. The configured branch supplies the workflow
+and runner; Builder uploads the current application source as a snapshot.
+
+- **Codemagic:** use a personal account and repository YAML. The workflow selects
+  the M2 Mac. Create an accessible environment group named `builder`; add
+  `BUILDER=1` for unsigned builds. Its Xcode selection is `latest`, which must
+  include the iOS 26 SDK.
+- **Bitrise:** select a macOS stack with Xcode 26 or later, enable configuration
+  from the repository's `bitrise.yml`, and disable onboarding-generated push
+  triggers. The workflow selects `g2.mac.medium`; keep the app timeout at or
+  below 90 minutes.
+
+See the official [Codemagic app setup](https://docs.codemagic.io/getting-started/adding-apps/)
+and [Bitrise app setup](https://docs.bitrise.io/en/bitrise-ci/getting-started/adding-a-new-project)
+guides for connecting the repository.
+
+### Signing and simulator access
+
+Numbra already enables signing for GitHub. Configure `IOS_CERTIFICATE`
+(base64 P12), `IOS_CERTIFICATE_PASSWORD`, and `IOS_PROVISIONING_PROFILE`
+(base64 provisioning profile for `run.mobai.numbra`) separately in Codemagic's
+`builder` group and Bitrise's app secrets. GitHub secrets cannot be downloaded
+and copied by Builder. Until signing is configured, test with:
+
+```sh
+builder ios build --provider codemagic --unsigned
+builder ios build --provider bitrise --unsigned
+```
+
+Unsigned IPAs do not install directly on an iPhone. Simulator sharing needs
+`MOBAI_API_KEY` on each provider and a MobAI account supporting CI devices:
+
+```sh
+builder ios share --provider codemagic --duration 20m
+builder ios share --provider bitrise --duration 20m
+```
+
+The CLI prints the run URL, cancellation command, and snapshot cleanup command.
+New-provider sharing returns once submitted; check the run for readiness and
+release or cancel sessions when finished. Provider selection is manual; free
+allowances are account-specific and are not pooled by Builder.

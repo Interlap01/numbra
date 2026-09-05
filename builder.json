@@ -6,11 +6,14 @@
     "repo": "numbra"
   },
   "ios": {
-    "signing": true
+    "signing": true,
+    "path": ".",
+    "scheme": "Numbra"
   },
   "flutter": {
     "watch": {}
   },
   "reactNative": {},
-  "mobai": {}
+  "mobai": {},
+  "provider": "github"
 }
