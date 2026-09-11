@@ -1,0 +1,5 @@
+{
+  "name": "numbra-ci",
+  "description": "Background services the Numbra flows do not need. Keeps StoreKit (trial CTA) and the photo picker.",
+  "except": ["store", "photos"]
+}
