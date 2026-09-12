@@ -13,14 +13,9 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-    inputs:
-      timing:
-        description: "Run only the boot timing experiment"
-        default: "false"
 
 jobs:
   build:
-    if: inputs.timing != 'true'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -57,7 +52,7 @@ jobs:
       - name: Install mobai-ci + boot simulator
         uses: MobAI-App/mobai-ci@v1
         with:
-          version: "0.5.6"
+          version: "0.5.7"
           boot-sim: true # UDID lands in $MOBAI_SIM_UDID
           sim-slim: ci/slim.json # services the flows never touch stay off
 
@@ -91,82 +86,3 @@ jobs:
         with:
           name: reports-shard-${{ matrix.shard }}
           path: reports
-
-  # Manual experiment: how long does the cached slim simulator take to boot a
-  # second time on the same runner, and does it still boot and run the flows
-  # after dropping its regenerable caches?
-  timing:
-    if: inputs.timing == 'true'
-    runs-on: macos-15
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-
-      # Does the runner image already carry the per-host dyld cache for the
-      # runtime, and how long does reading it take? Read it before the boot so
-      # the first boot starts warm.
-      - name: Start CPU sampler
-        run: |
-          echo "runtime roots:"; find /Applications/Xcode.app/Contents/Developer/Platforms /Library/Developer/CoreSimulator/Volumes -maxdepth 16 -type d -name RuntimeRoot -path '*iOS 26*' 2>/dev/null | head -3
-          # Every 5 s: load, top CPU consumers, disk reads. Runs through the
-          # first boot; printed after it.
-          nohup bash -c 'while true; do echo "--- $(date +%T) load=$(sysctl -n vm.loadavg)"; ps -Ao %cpu,rss,comm | sort -rn | head -8; sleep 5; done' > "$RUNNER_TEMP/sampler.log" 2>&1 &
-          echo "BOOT_T0=$(date +%s)" >> "$GITHUB_ENV"
-
-      - name: Install mobai-ci + boot simulator
-        uses: MobAI-App/mobai-ci@v1
-        with:
-          version: "0.5.6"
-          boot-sim: true
-          sim-slim: ci/slim.json
-
-      - name: First boot timing
-        run: |
-          T1=$(date +%s); xcrun simctl bootstatus "$MOBAI_SIM_UDID" -b >/dev/null; T2=$(date +%s)
-          echo "1st boot: action+restore+boot returned after $(( T1 - BOOT_T0 ))s, Boot Finished after $(( T2 - BOOT_T0 ))s"
-          echo "- 1st boot: returned $(( T1 - BOOT_T0 ))s, Boot Finished $(( T2 - BOOT_T0 ))s" >> "$GITHUB_STEP_SUMMARY"
-          pkill -f 'sort -rn' || true
-          echo "===== sampler ====="; cat "$RUNNER_TEMP/sampler.log"
-
-      - name: Build app (Debug, simulator)
-        run: |
-          brew install xcodegen >/dev/null 2>&1
-          xcodegen generate >/dev/null
-          xcodebuild -project Numbra.xcodeproj -scheme Numbra -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath build build -quiet
-          echo "APP=$(find build/Build/Products -name 'Numbra.app' -type d | head -1)" >> "$GITHUB_ENV"
-
-      - name: Timings
-        run: |
-          U="$MOBAI_SIM_UDID"; D="$HOME/Library/Developer/CoreSimulator/Devices/$U"
-          t() { python3 -c 'import time;print(int(time.time()))'; }
-          boot() { local t0=$(t); xcrun simctl boot "$U"; local t1=$(t); xcrun simctl bootstatus "$U" -b >/dev/null; echo "$(( t1 - t0 )) $(( $(t) - t0 ))"; }
-          xcrun simctl bootstatus "$U" -b >/dev/null
-          echo "device dir: $(du -sm "$D" | cut -f1) MB"
-          echo "disabled: $(xcrun simctl spawn "$U" launchctl print-disabled system | grep -c '=> disabled')"
-          xcrun simctl shutdown "$U"; sleep 3
-          read -r c2 f2 <<< "$(boot)"; echo "2nd boot (warm page cache, full device): simctl boot ${c2}s, finished ${f2}s"
-          xcrun simctl shutdown "$U"; sleep 3
-          rm -rf "$D/data/private/var/MobileAsset" "$D/data/Library/Caches"
-          echo "trimmed device dir: $(du -sm "$D" | cut -f1) MB"
-          read -r c3 f3 <<< "$(boot)"; echo "3rd boot (trimmed device): simctl boot ${c3}s, finished ${f3}s"
-          echo "disabled after trim: $(xcrun simctl spawn "$U" launchctl print-disabled system | grep -c '=> disabled')"
-          # A brand-new stock device on the now-warm host: is the first-boot
-          # penalty per device or per runner?
-          xcrun simctl shutdown "$U"; sleep 3
-          N=$(xcrun simctl create fresh-stock "iPhone 17 Pro"); U="$N"
-          read -r c4 f4 <<< "$(boot)"; echo "4th boot (fresh stock device, warm host): simctl boot ${c4}s, finished ${f4}s"
-          xcrun simctl shutdown "$N"; xcrun simctl delete "$N"; U="$MOBAI_SIM_UDID"; xcrun simctl boot "$U"
-          {
-            echo "### boot timing"
-            echo "- 2nd boot, warm cache, full device: simctl boot ${c2}s, Boot Finished ${f2}s"
-            echo "- 3rd boot, trimmed device: simctl boot ${c3}s, Boot Finished ${f3}s"
-            echo "- 4th boot, fresh stock device on the warm host: simctl boot ${c4}s, Boot Finished ${f4}s"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Flows on the trimmed device
-        env:
-          MOBAI_API_KEY: ${{ secrets.MOBAI_API_KEY }}
-        run: |
-          T0=$(date +%s)
-          mobai-ci test ./flows --app "$APP" --device "$MOBAI_SIM_UDID" --wait-device 4m --startup-timeout 5m --output reports
-          echo "- flows on trimmed device: $(( $(date +%s) - T0 ))s total" >> "$GITHUB_STEP_SUMMARY"
