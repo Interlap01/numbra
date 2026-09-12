@@ -112,9 +112,15 @@ jobs:
           D=$(ls -d /Library/Developer/CoreSimulator/Caches/dyld/*/com.apple.CoreSimulator.SimRuntime.iOS-26-* 2>/dev/null | sort -V | tail -1)
           echo "cache dir: ${D:-none}"
           if [ -n "$D" ]; then
-            ls -la "$D"
-            du -sm "$D"/dyld_sim_shared_cache_arm64* | sed 's/^/MB /'
-            T0=$(date +%s); cat "$D"/dyld_sim_shared_cache_arm64* > /dev/null; echo "pre-read took $(( $(date +%s) - T0 ))s"
+            T0=$(date +%s); cat "$D"/dyld_sim_shared_cache_arm64* > /dev/null; echo "dyld cache pre-read took $(( $(date +%s) - T0 ))s"
+          fi
+          # The runtime root itself: every daemon and framework outside the
+          # shared cache is read from here on the first boot.
+          RR=$(ls -d "/Library/Developer/CoreSimulator/Volumes/iOS_"*/Library/Developer/CoreSimulator/Profiles/Runtimes/"iOS 26."*.simruntime/Contents/Resources/RuntimeRoot 2>/dev/null | sort -V | tail -1)
+          echo "runtime root: ${RR:-none}"
+          if [ -n "$RR" ]; then
+            echo "runtime root size: $(du -sm "$RR" | cut -f1) MB"
+            T0=$(date +%s); find "$RR" -type f -print0 | xargs -0 cat > /dev/null 2>&1; echo "runtime root pre-read took $(( $(date +%s) - T0 ))s"
           fi
           echo "BOOT_T0=$(date +%s)" >> "$GITHUB_ENV"
 
@@ -154,10 +160,17 @@ jobs:
           echo "trimmed device dir: $(du -sm "$D" | cut -f1) MB"
           read -r c3 f3 <<< "$(boot)"; echo "3rd boot (trimmed device): simctl boot ${c3}s, finished ${f3}s"
           echo "disabled after trim: $(xcrun simctl spawn "$U" launchctl print-disabled system | grep -c '=> disabled')"
+          # A brand-new stock device on the now-warm host: is the first-boot
+          # penalty per device or per runner?
+          xcrun simctl shutdown "$U"; sleep 3
+          N=$(xcrun simctl create fresh-stock "iPhone 17 Pro"); U="$N"
+          read -r c4 f4 <<< "$(boot)"; echo "4th boot (fresh stock device, warm host): simctl boot ${c4}s, finished ${f4}s"
+          xcrun simctl shutdown "$N"; xcrun simctl delete "$N"; U="$MOBAI_SIM_UDID"; xcrun simctl boot "$U"
           {
             echo "### boot timing"
             echo "- 2nd boot, warm cache, full device: simctl boot ${c2}s, Boot Finished ${f2}s"
             echo "- 3rd boot, trimmed device: simctl boot ${c3}s, Boot Finished ${f3}s"
+            echo "- 4th boot, fresh stock device on the warm host: simctl boot ${c4}s, Boot Finished ${f4}s"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Flows on the trimmed device
