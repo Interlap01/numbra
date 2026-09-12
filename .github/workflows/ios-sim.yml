@@ -105,24 +105,12 @@ jobs:
       # Does the runner image already carry the per-host dyld cache for the
       # runtime, and how long does reading it take? Read it before the boot so
       # the first boot starts warm.
-      - name: Runtime cache diagnostics + pre-read
+      - name: Start CPU sampler
         run: |
-          # No simctl here: touching the simulator service before the image is
-          # restored leaves the restored device unregistered.
-          D=$(ls -d /Library/Developer/CoreSimulator/Caches/dyld/*/com.apple.CoreSimulator.SimRuntime.iOS-26-* 2>/dev/null | sort -V | tail -1)
-          echo "cache dir: ${D:-none}"
-          if [ -n "$D" ]; then
-            T0=$(date +%s); cat "$D"/dyld_sim_shared_cache_arm64* > /dev/null; echo "dyld cache pre-read took $(( $(date +%s) - T0 ))s"
-          fi
-          # The runtime root itself: every daemon and framework outside the
-          # shared cache is read from here on the first boot.
-          ls /Library/Developer/CoreSimulator/Volumes/ || true
-          RR=$(find /Library/Developer/CoreSimulator/Volumes -maxdepth 15 -type d -name RuntimeRoot -path '*iOS 26.*' 2>/dev/null | sort -V | tail -1)
-          echo "runtime root: ${RR:-none}"
-          if [ -n "$RR" ]; then
-            echo "runtime root size: $(du -sm "$RR" | cut -f1) MB"
-            T0=$(date +%s); find "$RR" -type f -print0 | xargs -0 cat > /dev/null 2>&1; echo "runtime root pre-read took $(( $(date +%s) - T0 ))s"
-          fi
+          echo "runtime roots:"; find /Applications/Xcode.app/Contents/Developer/Platforms /Library/Developer/CoreSimulator/Volumes -maxdepth 16 -type d -name RuntimeRoot -path '*iOS 26*' 2>/dev/null | head -3
+          # Every 5 s: load, top CPU consumers, disk reads. Runs through the
+          # first boot; printed after it.
+          nohup bash -c 'while true; do echo "--- $(date +%T) load=$(sysctl -n vm.loadavg)"; ps -Ao %cpu,rss,comm | sort -rn | head -8; sleep 5; done' > "$RUNNER_TEMP/sampler.log" 2>&1 &
           echo "BOOT_T0=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Install mobai-ci + boot simulator
@@ -136,8 +124,9 @@ jobs:
         run: |
           T1=$(date +%s); xcrun simctl bootstatus "$MOBAI_SIM_UDID" -b >/dev/null; T2=$(date +%s)
           echo "1st boot: action+restore+boot returned after $(( T1 - BOOT_T0 ))s, Boot Finished after $(( T2 - BOOT_T0 ))s"
-          echo "- 1st boot after pre-read: returned $(( T1 - BOOT_T0 ))s, Boot Finished $(( T2 - BOOT_T0 ))s" >> "$GITHUB_STEP_SUMMARY"
-          ls -la /Library/Developer/CoreSimulator/Caches/dyld/*/ 2>/dev/null | head -20
+          echo "- 1st boot: returned $(( T1 - BOOT_T0 ))s, Boot Finished $(( T2 - BOOT_T0 ))s" >> "$GITHUB_STEP_SUMMARY"
+          pkill -f 'sort -rn' || true
+          echo "===== sampler ====="; cat "$RUNNER_TEMP/sampler.log"
 
       - name: Build app (Debug, simulator)
         run: |
