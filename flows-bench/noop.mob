@@ -1,0 +1,4 @@
+# Benchmark no-op: no app, no interaction. Exists so "mobai-ci test" brings
+# the runner up on the simulator and immediately finishes, which bounds the
+# boot -> first-possible-test-action window.
+wait_stable timeout:5000

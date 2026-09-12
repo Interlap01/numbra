@@ -1,0 +1,45 @@
+# Benchmark: simulator boot -> first mobai-ci test finished, the way a CI
+# job without mobai-ci's cached image does it: boot the runner image's stock
+# iPhone 16 Pro with simctl, wait for bootstatus, run the same no-op flow.
+# No cache anywhere; every run pays the simulator's first boot.
+
+name: Bench stock boot
+
+on:
+  workflow_dispatch:
+
+jobs:
+  stock:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mobai-ci
+        uses: MobAI-App/mobai-ci@v1
+        with:
+          version: "0.5.7"
+
+      - name: Boot simulator (stock, no cache)
+        id: boot
+        run: |
+          set -e
+          UDID=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name == "iPhone 16 Pro")][0].udid')
+          echo "BENCH udid=$UDID"
+          T0=$(date +%s)
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          T1=$(date +%s)
+          echo "BENCH boot=$((T1-T0))s"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "T0=$T0" >> "$GITHUB_ENV"
+
+      - name: Run no-op flow
+        run: |
+          set -e
+          mobai-ci test flows-bench \
+            --device "${{ steps.boot.outputs.udid }}" \
+            --wait-device 4m --startup-timeout 5m \
+            --output reports
+          T2=$(date +%s)
+          echo "BENCH boot-start-to-test-finish=$((T2-T0))s"

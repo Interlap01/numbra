@@ -1,0 +1,72 @@
+# Benchmark: simulator boot -> first mobai-ci test finished, using the
+# mobai-ci cached slim image (mobai-ci sim boot --cache --slim).
+#
+# The first run on this branch is a cache miss and builds the image; the
+# second run is the real measurement (cache hit). The timed window starts at
+# "sim boot" (cache restore is timed separately, it is part of what a real
+# run pays) and ends when the no-op flow has finished.
+
+name: Bench slim boot
+
+on:
+  workflow_dispatch:
+
+jobs:
+  slim:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mobai-ci
+        uses: MobAI-App/mobai-ci@v1
+        with:
+          version: "0.5.7"
+
+      # Same key the composite action computes, so this benchmark measures
+      # exactly the cache a normal boot-sim run would hit.
+      - name: Compute simulator cache key
+        id: simkey
+        run: |
+          set -e
+          VER=$(mobai-ci version | awk '{print $2}')
+          SLUG=$(echo "iPhone 16 Pro-latest" | tr -c 'A-Za-z0-9.' '-')
+          SLIMTAG="-slim$(shasum -a 256 ci/slim.json | cut -c1-8)"
+          echo "key=mobai-sim-${ImageOS:-mac}-${ImageVersion:-0}-${VER}-${SLUG}${SLIMTAG}-v1" >> "$GITHUB_OUTPUT"
+
+      - name: Restore simulator cache
+        id: simcache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/mobai-cache
+          key: ${{ steps.simkey.outputs.key }}
+
+      - name: Boot simulator (slim, cached)
+        id: boot
+        run: |
+          set -e
+          T0=$(date +%s)
+          UDID=$(mobai-ci sim boot --cache "${{ runner.temp }}/mobai-cache" \
+            --device-type "iPhone 16 Pro" --runtime latest \
+            --slim ci/slim.json | tail -1)
+          T1=$(date +%s)
+          echo "BENCH cache-hit=${{ steps.simcache.outputs.cache-hit }}"
+          echo "BENCH boot=$((T1-T0))s udid=$UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "T0=$T0" >> "$GITHUB_ENV"
+
+      - name: Run no-op flow
+        run: |
+          set -e
+          mobai-ci test flows-bench \
+            --device "${{ steps.boot.outputs.udid }}" \
+            --wait-device 4m --startup-timeout 5m \
+            --output reports
+          T2=$(date +%s)
+          echo "BENCH boot-start-to-test-finish=$((T2-T0))s"
+
+      - name: Save simulator cache
+        if: steps.simcache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/mobai-cache
+          key: ${{ steps.simkey.outputs.key }}
