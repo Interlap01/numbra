@@ -117,7 +117,7 @@ jobs:
           # The runtime root itself: every daemon and framework outside the
           # shared cache is read from here on the first boot.
           ls /Library/Developer/CoreSimulator/Volumes/ || true
-          RR=$(find /Library/Developer/CoreSimulator/Volumes -maxdepth 9 -type d -name RuntimeRoot -path '*iOS 26.*' 2>/dev/null | sort -V | tail -1)
+          RR=$(find /Library/Developer/CoreSimulator/Volumes -maxdepth 15 -type d -name RuntimeRoot -path '*iOS 26.*' 2>/dev/null | sort -V | tail -1)
           echo "runtime root: ${RR:-none}"
           if [ -n "$RR" ]; then
             echo "runtime root size: $(du -sm "$RR" | cut -f1) MB"
