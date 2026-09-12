@@ -10,6 +10,8 @@ name: Bench slim boot
 
 on:
   workflow_dispatch:
+  push:
+    branches: [bench-boot-speed]
 
 jobs:
   slim:

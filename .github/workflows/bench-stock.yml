@@ -7,6 +7,8 @@ name: Bench stock boot
 
 on:
   workflow_dispatch:
+  push:
+    branches: [bench-boot-speed]
 
 jobs:
   stock:
