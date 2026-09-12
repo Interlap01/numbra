@@ -1,0 +1,55 @@
+# Boot timing experiments on the cached slim simulator (manual).
+name: boot timing
+on:
+  workflow_dispatch:
+
+jobs:
+  timing:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mobai-ci + boot simulator
+        id: boot
+        uses: MobAI-App/mobai-ci@v1
+        with:
+          version: "0.5.6"
+          boot-sim: true
+          sim-slim: ci/slim.json
+
+      - name: Build app (Debug, simulator)
+        run: |
+          brew install xcodegen >/dev/null 2>&1
+          xcodegen generate >/dev/null
+          xcodebuild -project Numbra.xcodeproj -scheme Numbra -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath build build -quiet
+          echo "APP=$(find build/Build/Products -name 'Numbra.app' -type d | head -1)" >> "$GITHUB_ENV"
+
+      - name: Timings
+        run: |
+          U="$MOBAI_SIM_UDID"; D="$HOME/Library/Developer/CoreSimulator/Devices/$U"
+          t() { python3 -c 'import time;print(int(time.time()))'; }
+          boot() { local t0=$(t); xcrun simctl boot "$U"; local t1=$(t); xcrun simctl bootstatus "$U" -b >/dev/null; echo "$(( t1 - t0 )) $(( $(t) - t0 ))"; }
+          xcrun simctl bootstatus "$U" -b >/dev/null
+          echo "device dir: $(du -sm "$D" | cut -f1) MB"
+          echo "disabled: $(xcrun simctl spawn "$U" launchctl print-disabled system | grep -c '=> disabled')"
+          xcrun simctl shutdown "$U"; sleep 3
+          read -r c2 f2 <<< "$(boot)"; echo "2nd boot (warm page cache, full device): simctl boot ${c2}s, finished ${f2}s"
+          xcrun simctl shutdown "$U"; sleep 3
+          rm -rf "$D/data/private/var/MobileAsset" "$D/data/Library/Caches"
+          echo "trimmed device dir: $(du -sm "$D" | cut -f1) MB"
+          read -r c3 f3 <<< "$(boot)"; echo "3rd boot (trimmed device): simctl boot ${c3}s, finished ${f3}s"
+          echo "disabled after trim: $(xcrun simctl spawn "$U" launchctl print-disabled system | grep -c '=> disabled')"
+          {
+            echo "### boot timing"
+            echo "- 2nd boot, warm cache, full device: simctl boot ${c2}s, Boot Finished ${f2}s"
+            echo "- 3rd boot, trimmed device: simctl boot ${c3}s, Boot Finished ${f3}s"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Flows on the trimmed device
+        env:
+          MOBAI_API_KEY: ${{ secrets.MOBAI_API_KEY }}
+        run: |
+          T0=$(date +%s)
+          mobai-ci test ./flows --app "$APP" --device "$MOBAI_SIM_UDID" --wait-device 4m --startup-timeout 5m --output reports
+          echo "- flows on trimmed device: $(( $(date +%s) - T0 ))s total" >> "$GITHUB_STEP_SUMMARY"
