@@ -102,12 +102,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Does the runner image already carry the per-host dyld cache for the
+      # runtime, and how long does reading it take? Read it before the boot so
+      # the first boot starts warm.
+      - name: Runtime cache diagnostics + pre-read
+        run: |
+          RT=$(xcrun simctl list -j runtimes | python3 -c 'import json,sys;r=[x for x in json.load(sys.stdin)["runtimes"] if x["platform"]=="iOS" and x["isAvailable"]];r.sort(key=lambda x:[int(p) for p in x["version"].split(".")]);x=r[-1];print(x["identifier"]+"."+x["buildversion"])')
+          echo "runtime: $RT"
+          ls -la /Library/Developer/CoreSimulator/Caches/dyld/*/ 2>/dev/null | head -20
+          D=$(ls -d /Library/Developer/CoreSimulator/Caches/dyld/*/$RT 2>/dev/null | head -1)
+          echo "cache dir: ${D:-none}"
+          if [ -n "$D" ]; then
+            ls -la "$D"
+            T0=$(date +%s); cat "$D"/dyld_sim_shared_cache_arm64* > /dev/null; echo "pre-read took $(( $(date +%s) - T0 ))s"
+          fi
+          echo "BOOT_T0=$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Install mobai-ci + boot simulator
         uses: MobAI-App/mobai-ci@v1
         with:
           version: "0.5.6"
           boot-sim: true
           sim-slim: ci/slim.json
+
+      - name: First boot timing
+        run: |
+          T1=$(date +%s); xcrun simctl bootstatus "$MOBAI_SIM_UDID" -b >/dev/null; T2=$(date +%s)
+          echo "1st boot: action+restore+boot returned after $(( T1 - BOOT_T0 ))s, Boot Finished after $(( T2 - BOOT_T0 ))s"
+          echo "- 1st boot after pre-read: returned $(( T1 - BOOT_T0 ))s, Boot Finished $(( T2 - BOOT_T0 ))s" >> "$GITHUB_STEP_SUMMARY"
+          ls -la /Library/Developer/CoreSimulator/Caches/dyld/*/ 2>/dev/null | head -20
 
       - name: Build app (Debug, simulator)
         run: |
