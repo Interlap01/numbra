@@ -46,15 +46,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4 # for flows/
 
-      # Installs mobai-ci and starts a simulator booting in the background
-      # (cached, so later runs boot fast). Stays before other steps so the
-      # boot overlaps the app download.
-      - name: Install mobai-ci + boot simulator
-        uses: MobAI-App/mobai-ci@v1
+      # Install only. This branch measures the cold slim boot, so the action's
+      # boot-sim (and the image cache behind it) is deliberately not used: the
+      # next step boots with no --cache at all, which is the path a first run on
+      # a fresh runner takes.
+      - name: Install mobai-ci
+        uses: MobAI-App/mobai-ci@main
         with:
-          version: "0.5.7"
-          boot-sim: true # UDID lands in $MOBAI_SIM_UDID
-          sim-slim: ci/slim.json # services the flows never touch stay off
+          version: "0.6.0"
+
+      # No --cache: create, slim while shut down, boot once already slim. The
+      # timing is the point of this run, so it is printed and kept in the step
+      # summary rather than buried in the log.
+      - name: Boot a slim simulator with no cache
+        run: |
+          set -e
+          start=$SECONDS
+          udid=$(mobai-ci sim boot --slim ci/slim.json --startup-timeout 8m | tail -1)
+          elapsed=$((SECONDS - start))
+          echo "MOBAI_SIM_UDID=$udid" >> "$GITHUB_ENV"
+          echo "shard ${{ matrix.shard }}: no-cache slim boot took ${elapsed}s (udid $udid)"
+          echo "shard ${{ matrix.shard }}: no-cache slim boot **${elapsed}s**" >> "$GITHUB_STEP_SUMMARY"
+
+      # Prove the simulator is really slim. status prints the numbers; verify
+      # exits non-zero if the overrides drift from the profile, so a silent
+      # fallback to a stock boot fails the job instead of passing quietly.
+      - name: Check the simulator is actually slim
+        run: |
+          brew install mobai-app/tap/simslim
+          simslim status "$MOBAI_SIM_UDID" | tee -a "$GITHUB_STEP_SUMMARY"
+          simslim verify "$MOBAI_SIM_UDID" --profile ci/slim.json
 
       - name: Download built .app
         uses: actions/download-artifact@v4
@@ -63,11 +84,10 @@ jobs:
           path: app-build/Numbra.app
 
       # --live shows this run's simulator in the MobAI app while it runs, so you
-      # can watch it. --hold-on-failure keeps it open afterwards if something
-      # breaks, so the failure can be looked at on the device that produced it
-      # instead of being reproduced locally. The window is idle time: it resets
-      # while you are using the device, and the job stays running until it
-      # closes or you release the device.
+      # can watch it. --hold-on-failure is left off on this branch on purpose:
+      # nobody is watching an unattended timing run, so a red shard would just
+      # hold a macOS runner open for ten idle minutes. Put it back for runs you
+      # intend to inspect.
       - name: Run flows (shard ${{ matrix.shard }}/2)
         env:
           MOBAI_API_KEY: ${{ secrets.MOBAI_API_KEY }}
@@ -77,7 +97,7 @@ jobs:
             --shard ${{ matrix.shard }}/2 \
             --device "$MOBAI_SIM_UDID" \
             --wait-device 4m --startup-timeout 5m \
-            --live --hold-on-failure 10m \
+            --live \
             --output reports
 
       - name: Upload reports
