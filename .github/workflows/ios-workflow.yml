@@ -1,0 +1,64 @@
+# Numbra CI: AI test workflows (.mobflow) on an iOS simulator.
+#
+# The steps in ./workflows are plain language, performed by the jev agent one at
+# a time. That needs a TypeSafe API key in the MOBAI_TYPESAFE_KEY secret.
+
+name: iOS workflows
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project + build (Debug, simulator)
+        run: |
+          xcodegen generate
+          xcodebuild -project Numbra.xcodeproj -scheme Numbra \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug -derivedDataPath build build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: numbra-app-workflows
+          path: build/Build/Products/Debug-iphonesimulator/Numbra.app
+
+  workflows:
+    needs: build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mobai-ci + boot simulator
+        uses: MobAI-App/mobai-ci@v1
+        with:
+          version: "0.7.0"
+          boot-sim: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: numbra-app-workflows
+          path: app-build/Numbra.app
+
+      - name: Run workflows
+        env:
+          MOBAI_TYPESAFE_KEY: ${{ secrets.MOBAI_TYPESAFE_KEY }}
+        run: |
+          mobai-ci test ./workflows \
+            --app app-build/Numbra.app \
+            --device "$MOBAI_SIM_UDID" \
+            --wait-device 4m --startup-timeout 5m \
+            --output reports
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-workflows
+          path: reports
