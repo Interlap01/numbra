@@ -1,35 +1,8 @@
-{
-  "name": "onboarding",
-  "steps": [
-    {
-      "id": "open-app",
-      "type": "act",
-      "title": "open the Numbra app"
-    },
-    {
-      "id": "welcome-shown",
-      "type": "assert",
-      "title": "the onboarding screen is shown with a Continue button"
-    },
-    {
-      "id": "continue-1",
-      "type": "act",
-      "title": "tap \"Continue\""
-    },
-    {
-      "id": "continue-2",
-      "type": "act",
-      "title": "tap \"Continue\""
-    },
-    {
-      "id": "try-free",
-      "type": "act",
-      "title": "tap \"Try it free\""
-    },
-    {
-      "id": "photo-pick-shown",
-      "type": "assert",
-      "title": "the photo picker screen is shown with a \"Choose from library\" button"
-    }
-  ]
-}
+# Numbra onboarding, written as you'd tell a tester. Jev works out what each
+# line is: something to do, or something to check.
+open the Numbra app
+the onboarding screen is shown with a Continue button
+tap "Continue"
+tap "Continue"
+tap "Try it free"
+the photo picker screen is shown with a "Choose from library" button
