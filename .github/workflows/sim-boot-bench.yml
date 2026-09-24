@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         variant: [stock, widgets]
-        trial: [1, 2, 3]
+        trial: [1, 2, 3, 4, 5]
     name: ${{ matrix.variant }} ${{ matrix.trial }}
     steps:
       - uses: actions/checkout@v4
