@@ -1,0 +1,5 @@
+# Tags: boottime
+app "com.apple.Preferences"
+wait_for ~"General" timeout:30000
+tap ~"General"
+assert_exists ~"About" timeout:10000
