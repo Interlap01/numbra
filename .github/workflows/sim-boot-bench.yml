@@ -1,6 +1,7 @@
-# How long a brand-new iOS simulator takes from boot to a passing test, stock
-# versus with background services turned off by simslim before its first boot.
-# Each job creates its own simulator, so every run starts from zero.
+# How long a brand-new iOS simulator takes from boot to a passing test: stock
+# versus with the home-screen widget services turned off before its first
+# boot (mobai-ci sim boot --slim-only widgets). Each job creates its own
+# simulator, so every run starts from zero.
 
 name: Simulator boot benchmark
 
@@ -13,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [stock, widgets, chronod]
+        variant: [stock, widgets]
         trial: [1, 2, 3]
     name: ${{ matrix.variant }} ${{ matrix.trial }}
     steps:
@@ -22,34 +23,19 @@ jobs:
       - name: Install mobai-ci
         uses: MobAI-App/mobai-ci@v1
         with:
-          version: "0.7.3"
-
-      - name: Install simslim
-        if: matrix.variant != 'stock'
-        run: brew install mobai-app/tap/simslim && simslim version
-
-      - name: Create a simulator
-        run: |
-          RUNTIME=$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; r=[x for x in json.load(sys.stdin)["runtimes"] if x["platform"]=="iOS" and x["isAvailable"]]; print(sorted(r,key=lambda x:[int(p) for p in x["version"].split(".")])[-1]["identifier"])')
-          UDID=$(xcrun simctl create bench "iPhone 16 Pro" "$RUNTIME")
-          echo "runtime $RUNTIME udid $UDID"
-          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          version: "0.7.4"
 
       - name: Boot and test, timed
         run: |
-          OTHERS="siri,search,icloud,store,pim,web,family,health,photos,apps,messaging,connectivity,telemetry,other"
           now() { python3 -c 'import time; print(time.time())'; }
+          SLIM=""
+          [ "${{ matrix.variant }}" = widgets ] && SLIM="--slim-only widgets"
           t0=$(now)
-          case "${{ matrix.variant }}" in
-            widgets) simslim on "$UDID" --except "$OTHERS" ;;
-            chronod) simslim on "$UDID" --except "$OTHERS" --keep com.apple.PosterBoard,com.apple.liveactivitiesd ;;
-            stock)   xcrun simctl boot "$UDID" ;;
-          esac
-          xcrun simctl bootstatus "$UDID" -b > /dev/null
+          UDID=$(mobai-ci sim boot $SLIM)
           t1=$(now)
-          mobai-ci test bench-flows --device "$UDID" --output reports --timeout 15m
+          mobai-ci test bench-flows --device "$UDID" --wait-device 4m --output reports --timeout 15m
           t2=$(now)
-          line=$(python3 -c "print(f'${{ matrix.variant }} trial=${{ matrix.trial }} boot={$t1-$t0:.1f} runner+test={$t2-$t1:.1f} total={$t2-$t0:.1f}')")
+          line=$(python3 -c "print(f'${{ matrix.variant }} trial=${{ matrix.trial }} simboot={$t1-$t0:.1f} runner+test={$t2-$t1:.1f} total={$t2-$t0:.1f}')")
           echo "RESULT $line"
           echo "$line" >> "$GITHUB_STEP_SUMMARY"
 
