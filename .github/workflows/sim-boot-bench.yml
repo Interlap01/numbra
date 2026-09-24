@@ -31,7 +31,7 @@ jobs:
           SLIM=""
           [ "${{ matrix.variant }}" = widgets ] && SLIM="--slim-only widgets"
           t0=$(now)
-          UDID=$(mobai-ci sim boot $SLIM)
+          UDID=$(mobai-ci sim boot $SLIM | tail -1)
           t1=$(now)
           mobai-ci test bench-flows --device "$UDID" --wait-device 4m --output reports --timeout 15m
           t2=$(now)
