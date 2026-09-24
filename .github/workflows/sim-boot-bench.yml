@@ -23,7 +23,7 @@ jobs:
       - name: Install mobai-ci
         uses: MobAI-App/mobai-ci@v1
         with:
-          version: "0.7.4"
+          version: "0.7.5"
 
       - name: Boot and test, timed
         run: |
@@ -33,7 +33,7 @@ jobs:
           t0=$(now)
           mobai-ci sim boot $SLIM
           t1=$(now)
-          mobai-ci test bench-flows --wait-device 4m --output reports --timeout 15m
+          mobai-ci test bench-flows --output reports --timeout 15m
           t2=$(now)
           line=$(python3 -c "print(f'${{ matrix.variant }} trial=${{ matrix.trial }} simboot={$t1-$t0:.1f} runner+test={$t2-$t1:.1f} total={$t2-$t0:.1f}')")
           echo "RESULT $line"
