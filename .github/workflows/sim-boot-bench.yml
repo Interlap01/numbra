@@ -31,9 +31,9 @@ jobs:
           SLIM=""
           [ "${{ matrix.variant }}" = widgets ] && SLIM="--slim-only widgets"
           t0=$(now)
-          UDID=$(mobai-ci sim boot $SLIM | tail -1)
+          mobai-ci sim boot $SLIM
           t1=$(now)
-          mobai-ci test bench-flows --device "$UDID" --wait-device 4m --output reports --timeout 15m
+          mobai-ci test bench-flows --wait-device 4m --output reports --timeout 15m
           t2=$(now)
           line=$(python3 -c "print(f'${{ matrix.variant }} trial=${{ matrix.trial }} simboot={$t1-$t0:.1f} runner+test={$t2-$t1:.1f} total={$t2-$t0:.1f}')")
           echo "RESULT $line"
