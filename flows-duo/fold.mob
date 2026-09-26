@@ -1,0 +1,15 @@
+# iPhone Duo: the app follows the hinge. Onboarding's "Continue" is the
+# anchor on both the outer screen (closed) and the inner one (open).
+app "run.mobai.numbra" fresh
+assert_exists ~"Continue" timeout:30000
+screenshot "open"
+fold closed
+assert_exists ~"Continue" timeout:20000
+screenshot "closed"
+fold book
+screenshot "book"
+fold 120
+screenshot "120"
+fold open
+assert_exists ~"Continue" timeout:20000
+screenshot "open-again"

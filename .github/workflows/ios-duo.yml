@@ -1,0 +1,65 @@
+# iPhone Duo on a GitHub-hosted runner: does the image have the simulator, and
+# does a .mob fold it. Runs on the Xcode 27 preview image.
+
+name: iOS Duo
+
+on:
+  workflow_dispatch:
+
+jobs:
+  duo:
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 27.1
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.1.app
+          xcodebuild -version
+
+      - name: What the image has
+        run: |
+          echo "== runtimes"; xcrun simctl list runtimes
+          echo "== Duo device types"; xcrun simctl list devicetypes | grep -i duo || echo "no iPhone Duo device type"
+          echo "== Duo devices"; xcrun simctl list devices available | grep -i duo || echo "no iPhone Duo simulator"
+
+      - name: Add the iOS 27.1 runtime if missing
+        run: |
+          if ! xcrun simctl list runtimes | grep -q "iOS 27.1"; then
+            xcodebuild -downloadPlatform iOS -buildVersion 27.1 || echo "download failed"
+            xcrun simctl list runtimes
+          fi
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build Numbra (Debug, simulator)
+        run: |
+          xcodegen generate
+          xcodebuild -project Numbra.xcodeproj -scheme Numbra \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug -derivedDataPath build build | tail -3
+
+      - name: Install mobai-ci
+        uses: MobAI-App/mobai-ci@v1
+        with:
+          version: "0.7.5"
+
+      - name: Boot an iPhone Duo
+        run: |
+          RT=$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; r=[x for x in json.load(sys.stdin)["runtimes"] if x["platform"]=="iOS" and x["isAvailable"]]; print(sorted(r,key=lambda x:[int(p) for p in x["version"].split(".")])[-1]["identifier"])')
+          echo "runtime $RT"
+          mobai-ci sim boot --name duo --device-type "iPhone Duo" --runtime "$RT" --slim-only widgets
+
+      - name: Fold it
+        run: |
+          mobai-ci test flows-duo --app build/Build/Products/Debug-iphonesimulator/Numbra.app \
+            --device duo --output reports --timeout 15m
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: duo-reports
+          path: reports
