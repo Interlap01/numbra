@@ -61,10 +61,17 @@ jobs:
           echo "runtime $RT"
           mobai-ci sim boot --name duo --device-type "iPhone Duo" --runtime "$RT" --slim-only widgets
 
+      - name: Install and launch Numbra with simctl (is the install itself slow on the Duo?)
+        run: |
+          UDID=$(xcrun simctl list devices | grep "duo (" | grep -o -E "[0-9A-F-]{36}" | head -1)
+          echo "udid $UDID"; t0=$(date +%s)
+          timeout 600 xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/Numbra.app; echo "install rc=$? $(( $(date +%s)-t0 ))s"
+          t0=$(date +%s); timeout 120 xcrun simctl launch "$UDID" run.mobai.numbra; echo "launch rc=$? $(( $(date +%s)-t0 ))s"
+          xcrun simctl terminate "$UDID" run.mobai.numbra || true
+
       - name: Fold it
         run: |
-          mobai-ci test flows-duo --app build/Build/Products/Debug-iphonesimulator/Numbra.app \
-            --device duo --output reports --timeout 15m
+          mobai-ci test flows-duo -v --device duo --output reports --timeout 15m
 
       - name: Upload reports
         if: always()
