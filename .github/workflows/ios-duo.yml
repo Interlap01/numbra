@@ -24,12 +24,21 @@ jobs:
           echo "== Duo device types"; xcrun simctl list devicetypes | grep -i duo || echo "no iPhone Duo device type"
           echo "== Duo devices"; xcrun simctl list devices available | grep -i duo || echo "no iPhone Duo simulator"
 
-      - name: Add the iOS 27.1 runtime if missing
+      - name: Get a runtime that has the Duo (27.1+)
         run: |
-          if ! xcrun simctl list runtimes | grep -q "iOS 27.1"; then
-            xcodebuild -downloadPlatform iOS -buildVersion 27.1 || echo "download failed"
-            xcrun simctl list runtimes
+          has_duo_runtime() { xcrun simctl list runtimes | grep -E "iOS 27\.[1-9]" >/dev/null; }
+          if ! has_duo_runtime; then
+            echo "== Xcode 27.1: download its own runtime"
+            xcodebuild -downloadPlatform iOS || echo "download failed"
           fi
+          if ! has_duo_runtime; then
+            echo "== Xcode 27.2 beta: download its own runtime"
+            sudo xcode-select -s /Applications/Xcode_27.2_beta.app
+            xcodebuild -version
+            xcodebuild -downloadPlatform iOS || echo "download failed"
+          fi
+          xcrun simctl list runtimes
+          has_duo_runtime || { echo "no iOS 27.1+ runtime obtainable on this image"; exit 1; }
 
       - name: Install XcodeGen
         run: brew install xcodegen
