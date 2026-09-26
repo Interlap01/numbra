@@ -5,12 +5,17 @@
     "owner": "Interlap01",
     "repo": "numbra"
   },
+  "codemagic": {},
+  "bitrise": {},
   "ios": {
-    "signing": true
+    "path": ".",
+    "signing": true,
+    "configuration": "Debug"
   },
   "flutter": {
     "watch": {}
   },
   "reactNative": {},
+  "kmp": {},
   "mobai": {}
 }
