@@ -65,13 +65,16 @@ jobs:
         run: |
           UDID=$(xcrun simctl list devices | grep "duo (" | grep -o -E "[0-9A-F-]{36}" | head -1)
           echo "udid $UDID"; t0=$(date +%s)
-          perl -e 'alarm shift; exec @ARGV' 600 xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/Numbra.app; echo "install rc=$? $(( $(date +%s)-t0 ))s"
-          t0=$(date +%s); perl -e 'alarm shift; exec @ARGV' 120 xcrun simctl launch "$UDID" run.mobai.numbra; echo "launch rc=$? $(( $(date +%s)-t0 ))s"
+          perl -e 'alarm shift; exec @ARGV' 600 xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/Numbra.app; echo "install rc=$? $(( $(date +%s)-t0 ))s" | tee -a "$GITHUB_STEP_SUMMARY"
+          t0=$(date +%s); perl -e 'alarm shift; exec @ARGV' 120 xcrun simctl launch "$UDID" run.mobai.numbra; echo "launch rc=$? $(( $(date +%s)-t0 ))s" | tee -a "$GITHUB_STEP_SUMMARY"
           xcrun simctl terminate "$UDID" run.mobai.numbra || true
 
       - name: Fold it
         run: |
-          mobai-ci test flows-duo -v --device duo --output reports --timeout 15m
+          t0=$(date +%s)
+          mobai-ci test flows-duo --device duo --output reports --timeout 15m 2>&1 | tee fold.log; rc=${PIPESTATUS[0]}
+          { echo "fold rc=$rc $(( $(date +%s)-t0 ))s"; grep -E "PASS|FAIL|line [0-9]+:|passed," fold.log; } | tee -a "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
       - name: Upload reports
         if: always()
