@@ -5,10 +5,14 @@ name: iOS Duo
 
 on:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner label"
+        default: xcode-27
 
 jobs:
   duo:
-    runs-on: xcode-27
+    runs-on: ${{ inputs.runner || 'xcode-27' }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
